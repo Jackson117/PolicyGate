@@ -9,6 +9,7 @@ dependencies = [
     # is for adapters/, eval/, store/, service/ and viz/ -- never for harness/.
     "pydantic>=2.9",
     "pyyaml>=6.0",
+    "tau2>=1.0.1",
 ]
 
 [project.optional-dependencies]
