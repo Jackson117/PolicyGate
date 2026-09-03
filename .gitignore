@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Env / secrets
+.env
+.env.local
+
+# OS
+.DS_Store
+
+# Experiment outputs (raw traces are large; keep configs + metrics)
+experiments/**/raw/
+experiments/**/figures/*.png
+
+# Vendored benchmark (pinned separately, see third_party/PIN.md)
+third_party/tau2-bench/
