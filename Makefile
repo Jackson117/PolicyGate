@@ -1,18 +1,10 @@
 UV ?= uv
-REPO := $(shell pwd)
-# Import paths are passed explicitly rather than relying on the .pth files that
-# this machine keeps re-hiding. See scripts/fix_editable_installs.sh.
-export PYTHONPATH := $(REPO)/src:$(REPO)/third_party/tau2-bench/src
 PY := .venv/bin/python
 
-.PHONY: fix sync test lint baseline analyze
-
-fix:
-	@./scripts/fix_editable_installs.sh
+.PHONY: sync test lint baseline analyze
 
 sync:
 	$(UV) sync --extra bench --extra dev
-	@./scripts/fix_editable_installs.sh
 
 test:
 	$(PY) -m pytest

@@ -19,17 +19,42 @@
 retail **114**、banking_knowledge **97**、airline **50**、telecom **2285**。
 前两个与 CLAUDE.md 一致；airline 和 telecom 的数字 CLAUDE.md 没写，记在这里备用。
 
-### 踩到的坑：macOS 把 `.pth` 标成隐藏，editable 安装静默失效
+### 踩到的坑：iCloud Drive 同步 `~/Documents`，editable 安装静默失效
 
-这台机器上有后台进程（端点/备份类 agent）会给新建文件打 `UF_HIDDEN` 标志。
-CPython 的 `site.addpackage()` **静默跳过隐藏的 `.pth` 文件**——不报错、不警告。
+**已解决——项目已从 `~/Documents/Code/PolicyGate` 移到 `~/Code/PolicyGate`。**
+下面保留记录，因为排查过程绕了弯路，而且这个坑对任何放在 `~/Documents`
+下的 Python 项目都成立。
 
-现象非常反直觉：`uv sync` 刚结束时 `import tau2` 正常，几分钟后同一条命令
-开始报 `ModuleNotFoundError`，而 venv 里一切看起来都正常，
-`.pth` 文件内容也正确。
+现象：`uv sync` 刚结束时 `import tau2` 正常，几分钟后同一条命令开始报
+`ModuleNotFoundError`，而 venv 里一切看起来都正常，`.pth` 文件内容也正确。
 
-修复：`scripts/unhide_pth.sh`（`chflags nohidden`）。
-**每次 `uv sync` / `pip install -e` 之后都要跑**，`make sync` 已经串好了。
+机制：iCloud 给它接管的文件打 macOS `UF_HIDDEN` 标志，而 CPython 的
+`site.addpackage()` **静默跳过隐藏的 `.pth` 文件**——不报错、不警告，
+editable 安装就这么消失了。
+
+**第一次归因错了**，当时写的是「端点/备份类 agent 在盖章」，并靠
+`chflags nohidden` 绕过去。那个结论站不住，两条证据推翻它：
+
+1. 新建的文件**不带** hidden 标志——不是有人在无差别盖章
+2. 出现了 iCloud 特征的冲突副本：`_editable_impl_policygate 2.pth`、
+   `uv_cache 2.json`、`direct_url 2.json`、`uv_build 2.json`，
+   以及带 `dataless` 标志（已驱逐到云端）的文件
+
+`~/Library/Mobile Documents/com~apple~CloudDocs/Documents` 存在，
+说明「桌面与文稿」同步是开着的。
+
+而且 `chflags` 方案后来**彻底失效**了——清完标志同一秒再查就又是 hidden，
+iCloud 抢得比脚本快。
+
+`.pth` 只是最先炸的地方。放在 iCloud 里还会有：`.venv` 上千个文件持续同步、
+`third_party/tau2-bench` 209MB 白占空间、`.git` 被插一脚可能产生冲突副本、
+文件被驱逐成 `dataless` 导致跑批中途卡住。
+
+搬到 `~/Code/` 之后全部消失：`.pth` 标志干净、无冲突副本、
+裸调用 `tau2` 不需要 `PYTHONPATH`。绕行用的
+`scripts/fix_editable_installs.sh` 和 Makefile 里的 `PYTHONPATH` 都已删除。
+
+⚠️ 你 `~/Documents/Code/` 下还有约 35 个其它项目，同样在被 iCloud 同步。
 
 ---
 

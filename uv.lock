@@ -1500,7 +1500,6 @@ source = { editable = "." }
 dependencies = [
     { name = "pydantic" },
     { name = "pyyaml" },
-    { name = "tau2" },
 ]
 
 [package.optional-dependencies]
@@ -1539,7 +1538,6 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
     { name = "sqlalchemy", marker = "extra == 'store'", specifier = ">=2.0" },
     { name = "streamlit", marker = "extra == 'viz'", specifier = ">=1.38" },
-    { name = "tau2", editable = "third_party/tau2-bench" },
     { name = "tau2", extras = ["knowledge", "experiments"], marker = "extra == 'bench'", editable = "third_party/tau2-bench" },
     { name = "uvicorn", marker = "extra == 'service'", specifier = ">=0.30" },
 ]

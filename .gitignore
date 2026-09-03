@@ -15,8 +15,11 @@ venv/
 # OS
 .DS_Store
 
-# Experiment outputs (raw traces are large; keep configs + metrics)
+# Experiment outputs. Keep the config that produced a run and the derived
+# metrics; keep raw traces out -- one retail results.json is ~7MB and every
+# ablation cell produces another.
 experiments/**/raw/
+experiments/**/results.json
 experiments/**/figures/*.png
 
 # Vendored benchmark (pinned separately, see third_party/PIN.md)
