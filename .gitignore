@@ -19,7 +19,7 @@ venv/
 # metrics; keep raw traces out -- one retail results.json is ~7MB and every
 # ablation cell produces another.
 experiments/**/raw/
-experiments/**/results.json
+experiments/**/results*.json
 experiments/**/figures/*.png
 
 # Vendored benchmark (pinned separately, see third_party/PIN.md)
