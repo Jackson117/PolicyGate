@@ -5,9 +5,13 @@ description = "Reliability and audit harness for policy-following trading agents
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = [
-    # harness/ depends on pydantic + stdlib ONLY. Everything below this line
-    # is for adapters/, eval/, store/, service/ and viz/ -- never for harness/.
+    # harness/ may import pydantic, deepdiff and the stdlib -- nothing else, and
+    # no agent framework. deepdiff is declared here rather than inherited from
+    # tau2 (which lives in the `bench` extra) so that harness/ imports cleanly
+    # with the benchmark absent.
+    "deepdiff>=8.4.2",
     "pydantic>=2.9",
+    # Below this line: for adapters/, eval/, store/, service/ and viz/ only.
     "pyyaml>=6.0",
 ]
 

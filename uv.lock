@@ -1498,6 +1498,7 @@ name = "policygate"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "deepdiff" },
     { name = "pydantic" },
     { name = "pyyaml" },
 ]
@@ -1528,6 +1529,7 @@ viz = [
 [package.metadata]
 requires-dist = [
     { name = "alembic", marker = "extra == 'store'", specifier = ">=1.13" },
+    { name = "deepdiff", specifier = ">=8.4.2" },
     { name = "langgraph", marker = "extra == 'service'", specifier = ">=0.2" },
     { name = "langgraph-checkpoint-postgres", marker = "extra == 'service'", specifier = ">=2.0" },
     { name = "psycopg", extras = ["binary"], marker = "extra == 'store'", specifier = ">=3.2" },
