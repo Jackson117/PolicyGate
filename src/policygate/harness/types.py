@@ -27,7 +27,6 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from litellm import field_validator, model_validator
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -38,12 +37,13 @@ def canonical_json(value: Any) -> str:
     every run, because this string is what gets hashed into the audit chain and
     what idempotency keys are derived from.
     """
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
-    # return json.dump(value, separators=(",", ":"), sort_keys=True, ensure_ascii=False, default=str)
+    return json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str
+    )
 
 
 def sha256_hex(text: str | bytes) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return hashlib.sha256(text.encode("utf-8") if isinstance(text, str) else text).hexdigest()
 
 
 class ToolKind(StrEnum):
