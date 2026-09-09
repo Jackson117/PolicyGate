@@ -139,11 +139,14 @@ class ToolGate:
         if state is SessionState.SCOPED:
             return frozenset(self._tools)
 
-        # VERIFIED: reads are open, but no unique write target exists yet, so a
-        # write would have to guess its referent -- which is what task 14 was.
-        return frozenset(
-            name for name, spec in self._tools.items() if spec.kind is not ToolKind.WRITE
-        )
+        if state is SessionState.VERIFIED:
+            # VERIFIED: reads are open, but no unique write target exists yet, so a
+            # write would have to guess its referent -- which is what task 14 was.
+            return frozenset(
+                name for name, spec in self._tools.items() if spec.kind is not ToolKind.WRITE
+            )
+
+        raise AssertionError(f"{state} is not a legal SessionState")
 
     # --- enforcement -------------------------------------------------------
 
