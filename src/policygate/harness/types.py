@@ -61,6 +61,37 @@ class ToolKind(StrEnum):
     GENERIC = "generic"
 
 
+class ToolRole(StrEnum):
+    """What a tool is *for*, where its kind does not say.
+
+    Two distinctions gating needs that ToolKind cannot make. In retail the
+    identity lookups (`find_user_id_by_email`, `find_user_id_by_name_zip`) are
+    typed READ, exactly like `get_user_details`, which returns the profile --
+    so kind alone cannot express "may run before the user is authenticated".
+    And `transfer_to_human_agents` is typed GENERIC, alongside `calculate`.
+
+    Roles are declared per domain by the adapter, since which tool
+    authenticates is a domain fact, not something the harness can infer.
+    """
+
+    ORDINARY = "ordinary"
+    IDENTITY_LOOKUP = "identity_lookup"
+    """Establishes which subject the session is about. Legal before verification."""
+
+    ESCALATION = "escalation"
+    """Hands the conversation to a human. Always legal while the session is live."""
+
+
+class ToolSpec(BaseModel):
+    """What the harness knows about a tool it may be asked to gate."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    kind: ToolKind
+    role: ToolRole = ToolRole.ORDINARY
+
+
 class ToolCall(BaseModel):
 
     model_config = ConfigDict(frozen=True)

@@ -33,6 +33,12 @@ class TestArms:
     def test_full_accepts_overrides(self):
         assert HarnessConfig.full(idempotency_enabled=True).idempotency_enabled is True
 
+    def test_full_can_override_a_switch_it_sets_itself(self):
+        # The earlier version splatted **overrides next to explicit keywords, so
+        # this raised TypeError -- and it is the exact call an ablation arm makes.
+        assert HarnessConfig.full(gating_enabled=False).gating_enabled is False
+        assert HarnessConfig.full(gating_enabled=False).schema_check_enabled is True
+
 
 class TestAblationSwitches:
     def test_switches_are_discovered_from_the_model_not_hand_listed(self):

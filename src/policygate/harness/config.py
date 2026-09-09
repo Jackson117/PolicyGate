@@ -166,22 +166,25 @@ class HarnessConfig(BaseModel):
         Mechanisms deferred by schedule (idempotency) or not yet written stay
         off here, so that `full` always describes an arm that can actually run.
         """
-        return cls(
-            name="full",
-            gating_enabled=True,
-            context_pruning_enabled=True,
-            schema_check_enabled=True,
-            value_canonicalization_enabled=True,
-            referent_uniqueness_enabled=True,
-            precondition_check_enabled=True,
-            parallel_call_block_enabled=True,
-            classified_retry_enabled=True,
-            compensation_enabled=True,
-            approval_gate_enabled=True,
-            audit_enabled=True,
-            loop_guards_enabled=True,
-            **overrides,  # type: ignore[arg-type]
-        )
+        # Merged rather than splatted alongside the keywords: passing
+        # `full(gating_enabled=False)` would otherwise collide with the explicit
+        # argument and raise, which is exactly how an ablation arm gets built.
+        defaults: dict[str, object] = {
+            "name": "full",
+            "gating_enabled": True,
+            "context_pruning_enabled": True,
+            "schema_check_enabled": True,
+            "value_canonicalization_enabled": True,
+            "referent_uniqueness_enabled": True,
+            "precondition_check_enabled": True,
+            "parallel_call_block_enabled": True,
+            "classified_retry_enabled": True,
+            "compensation_enabled": True,
+            "approval_gate_enabled": True,
+            "audit_enabled": True,
+            "loop_guards_enabled": True,
+        }
+        return cls(**(defaults | overrides))
 
     @classmethod
     def ablation_switches(cls) -> tuple[str, ...]:
