@@ -33,6 +33,26 @@ returned, never from what anyone said. An order id the user mentioned but that
 was never looked up is not a known referent, which is the same rule the state
 machine applies to identity and the reason invented ids are caught at all.
 
+Two boundaries, stated because they are otherwise only visible by reading the
+code:
+
+*This runs after gating, and assumes it.* An unregistered tool passes every
+check here -- there is no schema, no referent field and no precondition to apply
+-- because refusing it is
+:class:`~policygate.harness.gating.GateRule.UNKNOWN_TOOL`'s job. Duplicating
+that refusal would double-count it in the ablation table. The consequence is
+real and is what an ablation is meant to expose: with gating switched off, an
+arm running validation alone does not refuse unknown tools.
+
+*Types are the provider's job.* This checks which arguments are present and
+whether constrained fields hold a stored value; it does not type-check the
+rest, because the provider already validates against the JSON schema it was
+given. That delegation is evidenced rather than assumed: of the 52 tool errors
+W1 recorded, 41 were a referent that did not exist and 11 were an unmet
+precondition. Not one was a type error or a missing argument -- so
+``schema_check_enabled`` is insurance with no W1 evidence behind it, unlike the
+other three switches, and should be read that way in the ablation table.
+
 Pydantic and the standard library only. See CLAUDE.md constraint #2.
 """
 
@@ -82,8 +102,9 @@ class ArgumentSchema(BaseModel):
     """Which arguments a tool takes. Presence and spelling only.
 
     Deliberately not a full type checker: the provider already validates against
-    the JSON schema it was given, and what W1 actually produced were missing and
-    misspelled fields, not type errors.
+    the JSON schema it was given. W1 recorded no type errors and no missing
+    arguments either, so this check is insurance rather than a response to
+    observed behaviour -- see the module docstring.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -230,7 +251,24 @@ class Validator:
             if constraint.field not in call.arguments:
                 continue
             value = call.arguments[constraint.field]
-            if not isinstance(value, str) or value in constraint.allowed:
+            if isinstance(value, str) and value in constraint.allowed:
+                continue
+            if not isinstance(value, str):
+                # A constrained field is an enumeration of strings; anything else
+                # cannot be the stored form, and letting state=42 through would
+                # be a hole in exactly the check meant to close it.
+                failures.append(
+                    CheckFailure(
+                        code=FailureCode.VALUE_NOT_CANONICAL,
+                        field=constraint.field,
+                        message=(
+                            f"{constraint.field}={value!r} is {type(value).__name__}, "
+                            f"expected one of {sorted(constraint.allowed)}"
+                        ),
+                        observed=value,
+                        expected=sorted(constraint.allowed),
+                    )
+                )
                 continue
             canonical = constraint.canonical_for(value)
             hint = (
@@ -261,6 +299,11 @@ class Validator:
             return CheckResult.ok()
 
         if referent is None:
+            # The schema check already reports a missing required argument. Two
+            # failures naming the same field would read as two things to fix.
+            schema = self._c.schemas.get(call.name)
+            if self._config.schema_check_enabled and schema and field in schema.required:
+                return CheckResult.ok()
             return CheckResult.failed(
                 CheckFailure(
                     code=FailureCode.SCHEMA_INVALID,
@@ -287,7 +330,7 @@ class Validator:
         if scoped_target is not None and referent != scoped_target:
             return CheckResult.failed(
                 CheckFailure(
-                    code=FailureCode.REFERENT_AMBIGUOUS,
+                    code=FailureCode.REFERENT_MISMATCH,
                     field=field,
                     message=(
                         f"the session is scoped to {scoped_target!r} but this acts on "
@@ -328,5 +371,23 @@ class Validator:
 
 
 def world_from(objects: Iterable[KnownObject]) -> dict[str, KnownObject]:
-    """Index observed objects by id, for passing to :meth:`Validator.review`."""
-    return {o.id: o for o in objects}
+    """Index observed objects by id, for passing to :meth:`Validator.review`.
+
+    Conflicting duplicates are rejected rather than resolved last-wins, matching
+    ToolGate's stance on a duplicated tool: a constructor handed two different
+    accounts of the same object has no basis for choosing between them, and
+    picking one silently would decide which world the checks run against.
+
+    Re-reading an object whose state has since changed is a different thing --
+    assign into the mapping, where last-wins is the intended meaning.
+    """
+    world: dict[str, KnownObject] = {}
+    for obj in objects:
+        existing = world.get(obj.id)
+        if existing is not None and existing != obj:
+            raise ValueError(
+                f"conflicting observations of {obj.id!r}: {existing.attributes} vs "
+                f"{obj.attributes}; assign into the mapping if the object changed"
+            )
+        world[obj.id] = obj
+    return world

@@ -73,7 +73,7 @@ class TestCheckResult:
 
     def test_merge_keeps_every_failure(self):
         f1 = CheckFailure(code=FailureCode.VALUE_NOT_CANONICAL, message="state")
-        f2 = CheckFailure(code=FailureCode.REFERENT_AMBIGUOUS, message="order")
+        f2 = CheckFailure(code=FailureCode.REFERENT_MISMATCH, message="order")
         merged = CheckResult.failed(f1).merged_with(CheckResult.failed(f2))
         assert merged.passed is False
         assert len(merged.failures) == 2

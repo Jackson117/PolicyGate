@@ -158,7 +158,7 @@ class FailureCode(StrEnum):
     TOOL_NOT_AVAILABLE = "tool_not_available"  # exists, but gated out in this state
     SCHEMA_INVALID = "schema_invalid"       # arguments do not match the signature
     VALUE_NOT_CANONICAL = "value_not_canonical"  # task 22: "United States" vs "USA"
-    REFERENT_AMBIGUOUS = "referent_ambiguous"    # task 14: several candidate orders
+    REFERENT_MISMATCH = "referent_mismatch"      # task 14: wrote to a different order
     REFERENT_UNKNOWN = "referent_unknown"        # the 31x "Order not found"
     PRECONDITION_UNMET = "precondition_unmet"    # e.g. exchanging a non-delivered order
     PARALLEL_TOOL_CALLS = "parallel_tool_calls"  # retail policy.md: one call at a time

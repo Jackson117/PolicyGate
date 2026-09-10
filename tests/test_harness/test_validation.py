@@ -146,7 +146,7 @@ class TestReferentIdentity:
             scoped_target="#W5490111",
             world=WORLD,
         )
-        assert FailureCode.REFERENT_AMBIGUOUS in codes(result)
+        assert FailureCode.REFERENT_MISMATCH in codes(result)
 
     def test_the_scoped_object_passes(self):
         result = validator().review(
@@ -158,10 +158,30 @@ class TestReferentIdentity:
         assert result.passed
 
     def test_a_missing_referent_argument_is_reported(self):
+        # cancel_pending_order has no registered schema, so this failure can only
+        # come from the referent check.
         result = validator().review(
             call("cancel_pending_order"), scoped_target="#W7387996", world=WORLD
         )
         assert FailureCode.SCHEMA_INVALID in codes(result)
+
+    def test_a_missing_referent_is_reported_once_not_twice(self):
+        # The schema check already names a missing required argument; a second
+        # failure on the same field reads as two separate things to fix.
+        result = validator().review(
+            call("return_delivered_order_items", item_ids=["x"], payment_method_id="p"),
+            scoped_target="#W5490111",
+            world=WORLD,
+        )
+        assert [f.field for f in result.failures].count("order_id") == 1
+
+    def test_the_referent_check_still_reports_it_when_no_schema_covers_it(self):
+        result = validator(schema_check_enabled=False).review(
+            call("return_delivered_order_items", item_ids=["x"]),
+            scoped_target="#W5490111",
+            world=WORLD,
+        )
+        assert any(f.field == "order_id" for f in result.failures)
 
     def test_tools_without_a_declared_referent_are_not_checked(self):
         assert validator().review(call("get_product_details", product_id="p1"), world=WORLD).passed
@@ -259,8 +279,8 @@ class TestSwitchesAreIndependent:
         [
             ("value_canonicalization_enabled", FailureCode.VALUE_NOT_CANONICAL),
             # These args name a known order that is not the scoped one, so the
-            # referent failure here is AMBIGUOUS rather than UNKNOWN.
-            ("referent_uniqueness_enabled", FailureCode.REFERENT_AMBIGUOUS),
+            # referent failure here is a MISMATCH rather than UNKNOWN.
+            ("referent_uniqueness_enabled", FailureCode.REFERENT_MISMATCH),
             ("precondition_check_enabled", FailureCode.PRECONDITION_UNMET),
         ],
     )
@@ -293,3 +313,53 @@ class TestSwitchesAreIndependent:
     def test_the_baseline_arm_validates_nothing(self):
         v = Validator(CONSTRAINTS, HarnessConfig.baseline())
         assert v.review(call("modify_user_address", country="United States")).passed
+
+
+class TestNonStringValues:
+    def test_a_constrained_field_holding_a_number_is_refused(self):
+        # A constrained field is an enumeration of strings; state=42 passing
+        # would be a hole in the check meant to close exactly that.
+        result = validator().review(call("modify_user_address", state=42))
+        assert FailureCode.VALUE_NOT_CANONICAL in codes(result)
+
+    def test_the_refusal_names_the_type_it_got(self):
+        result = validator().review(call("modify_user_address", country=None))
+        assert "NoneType" in result.failures[0].message
+
+    def test_a_list_is_refused_too(self):
+        result = validator().review(call("modify_user_address", state=["NY"]))
+        assert result.passed is False
+
+
+class TestCompositionWithGating:
+    """Validation runs after gating and assumes it. Pinned here so the ordering
+    is not merely implied by the code."""
+
+    def test_an_unregistered_tool_passes_every_check(self):
+        # Refusing it is GateRule.UNKNOWN_TOOL's job; duplicating the refusal
+        # would double-count it in the ablation table.
+        assert validator().review(call("totally_unknown_tool", anything=1)).passed
+
+    def test_which_means_validation_alone_does_not_refuse_unknown_tools(self):
+        # The consequence an ablation is meant to expose, not a defect.
+        assert validator().review(call("drop_all_orders")).passed
+
+
+class TestWorldFrom:
+    def test_conflicting_observations_of_one_object_are_rejected(self):
+        with pytest.raises(ValueError, match="conflicting observations"):
+            world_from(
+                [
+                    KnownObject(id="#W1", attributes={"status": "pending"}),
+                    KnownObject(id="#W1", attributes={"status": "cancelled"}),
+                ]
+            )
+
+    def test_an_identical_repeat_is_harmless(self):
+        obj = KnownObject(id="#W1", attributes={"status": "pending"})
+        assert world_from([obj, obj]) == {"#W1": obj}
+
+    def test_assigning_into_the_mapping_is_how_an_object_changes(self):
+        world = world_from([KnownObject(id="#W1", attributes={"status": "pending"})])
+        world["#W1"] = KnownObject(id="#W1", attributes={"status": "cancelled"})
+        assert world["#W1"].attributes["status"] == "cancelled"
