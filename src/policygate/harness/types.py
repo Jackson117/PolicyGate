@@ -267,8 +267,10 @@ class AuditRecord(BaseModel):
     behind it), and verifiable order (``prev_hash`` makes tampering break the
     chain). ``record_hash`` covers everything above it including ``prev_hash``.
 
-    ``timestamp`` is supplied by the caller. A chain that embeds wall-clock time
-    it read itself cannot be recomputed by anyone checking it later.
+    ``timestamp`` is supplied by the caller. Verification works either way --
+    the hash is recomputed from the stored timestamp -- but a chain that reads
+    the clock itself cannot be reproduced by re-running the same experiment, and
+    cannot be asserted on in a test.
     """
 
     model_config = ConfigDict(frozen=True)
