@@ -22,8 +22,10 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 from tau2.data_model.message import ToolCall as Tau2ToolCall
+from tau2.data_model.tasks import Task
 from tau2.environment.toolkit import ToolKitBase, ToolType, get_tool_types
 
+from policygate.harness.approval import ExpectedAction, GroundTruth
 from policygate.harness.types import ClauseRef, ToolCall, ToolKind, ToolRole, ToolSpec
 from policygate.harness.validation import (
     ArgumentSchema,
@@ -223,6 +225,36 @@ def retail_constraints(db: Mapping[str, Any]) -> DomainConstraints:
             t: ArgumentSchema(tool=t, required=frozenset({"order_id"}))
             for t in ("cancel_pending_order",)
         },
+    )
+
+
+def ground_truth(task: Task) -> GroundTruth:
+    """Lift a task's reference trajectory into the form the oracle reads.
+
+    Only the assistant's own actions: a ``user`` requestor marks a call made in
+    the user's environment, which the agent never proposes and the approval gate
+    therefore never sees.
+
+    Note what this is not. ``evaluation_criteria.actions`` is one path to the
+    target end state, and retail is scored on the database, so an agent taking a
+    different route to the same state passes while this list does not sanction
+    it. The oracle built on it is strict, not omniscient -- see
+    :class:`~policygate.harness.approval.GroundTruth`.
+    """
+    criteria = task.evaluation_criteria
+    actions = () if criteria is None else tuple(criteria.actions or ())
+    return GroundTruth(
+        task_id=task.id,
+        actions=tuple(
+            ExpectedAction(
+                action_id=a.action_id,
+                name=a.name,
+                arguments=dict(a.arguments or {}),
+                compare_args=None if a.compare_args is None else tuple(a.compare_args),
+            )
+            for a in actions
+            if a.requestor == "assistant"
+        ),
     )
 
 

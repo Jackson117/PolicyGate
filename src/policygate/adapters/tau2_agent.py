@@ -46,6 +46,7 @@ from tau2.environment.tool import Tool
 from tau2.utils.llm_utils import generate
 
 from policygate.adapters.tool_mapping import ExtractedFacts, to_harness_call
+from policygate.harness.approval import ApprovalDecider, auto_approve
 from policygate.harness.audit import AuditChain
 from policygate.harness.config import HarnessConfig
 from policygate.harness.gating import GateRule, ToolGate
@@ -56,7 +57,6 @@ from policygate.harness.state import (
     StateError,
 )
 from policygate.harness.types import (
-    ApprovalDecision,
     ApprovalRequest,
     ApprovalStatus,
     AuditEvent,
@@ -91,22 +91,7 @@ SYSTEM_PROMPT = """
 </policy>
 """.strip()
 
-ApprovalDecider = Callable[[ApprovalRequest], ApprovalDecision]
 FactExtractor = Callable[..., ExtractedFacts]
-
-
-def auto_approve(request: ApprovalRequest) -> ApprovalDecision:
-    """The default approval policy: say yes, and say that that is what happened.
-
-    The other three policies in HarnessConfig -- auto_reject, oracle and
-    noisy_oracle -- belong to harness/approval.py; the oracle in particular needs
-    the task's ground truth, which this adapter has no business holding.
-    """
-    return ApprovalDecision(
-        request_id=request.request_id,
-        status=ApprovalStatus.APPROVED,
-        policy="auto_approve",
-    )
 
 
 class HarnessAgentState:

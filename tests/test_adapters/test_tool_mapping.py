@@ -9,17 +9,19 @@ import json
 
 import pytest
 from tau2.data_model.message import ToolCall as Tau2ToolCall
+from tau2.data_model.tasks import Action
 from tau2.registry import registry
 
 from policygate.adapters.tool_mapping import (
     RETAIL_ESCALATION,
     RETAIL_IDENTITY_LOOKUPS,
+    ground_truth,
     retail_constraints,
     retail_facts,
     to_harness_call,
     tool_specs,
 )
-from policygate.harness.types import ToolKind, ToolRole
+from policygate.harness.types import ToolCall, ToolKind, ToolRole
 
 
 @pytest.fixture(scope="module")
@@ -168,3 +170,63 @@ class TestRetailConstraints:
 
     def test_an_empty_database_yields_no_value_constraints(self):
         assert retail_constraints({}).value_constraints == ()
+
+
+# --- ground truth ---------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def retail_tasks():
+    return registry.get_tasks_loader("retail")(None)
+
+
+def test_ground_truth_sanctions_the_task_s_own_reference_calls(retail_tasks):
+    """Round-trip: replay a golden action as a call and the oracle must accept it."""
+    task = next(
+        t
+        for t in retail_tasks
+        if t.evaluation_criteria is not None
+        and any(a.requestor == "assistant" for a in t.evaluation_criteria.actions or ())
+    )
+    truth = ground_truth(task)
+    assert truth.task_id == task.id
+    assert truth.actions
+
+    for action in task.evaluation_criteria.actions:
+        if action.requestor != "assistant":
+            continue
+        replayed = ToolCall(id="x", name=action.name, arguments=dict(action.arguments))
+        assert truth.sanctions(replayed), action.action_id
+
+
+def test_ground_truth_drops_actions_the_agent_never_proposes(retail_tasks):
+    """A `user` requestor acts in the user's environment; the gate never sees it.
+
+    Injected rather than found: all 114 retail reference trajectories are
+    assistant-only, so a test that merely scanned them would pass without
+    exercising the filter. Telecom is where this case occurs for real.
+    """
+    task = next(t for t in retail_tasks if t.evaluation_criteria.actions)
+    criteria = task.evaluation_criteria
+    user_action = Action(
+        action_id="user_side_1",
+        requestor="user",
+        name="turn_on_wifi",
+        arguments={},
+    )
+    injected = task.model_copy(
+        update={
+            "evaluation_criteria": criteria.model_copy(
+                update={"actions": [*criteria.actions, user_action]}
+            )
+        }
+    )
+
+    lifted = {a.action_id for a in ground_truth(injected).actions}
+    assert "user_side_1" not in lifted
+    assert lifted == {a.action_id for a in criteria.actions}
+
+
+def test_a_task_without_evaluation_criteria_yields_an_empty_trajectory(retail_tasks):
+    task = retail_tasks[0].model_copy(update={"evaluation_criteria": None})
+    assert ground_truth(task).actions == ()

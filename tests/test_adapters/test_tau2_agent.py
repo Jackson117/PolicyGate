@@ -31,9 +31,20 @@ from policygate.adapters.tool_mapping import (
     retail_facts,
     tool_specs,
 )
-from policygate.harness.config import HarnessConfig
+from policygate.harness.approval import (
+    ExpectedAction,
+    GroundTruth,
+    make_decider,
+    summarise_approvals,
+)
+from policygate.harness.config import ApprovalConfig, ApprovalPolicy, HarnessConfig
 from policygate.harness.state import SessionState
-from policygate.harness.types import ApprovalDecision, ApprovalStatus, AuditEvent
+from policygate.harness.types import (
+    ApprovalDecision,
+    ApprovalStatus,
+    AuditEvent,
+    ToolKind,
+)
 
 CLOCK = lambda: datetime(2026, 1, 1, 12, 0, 0)  # noqa: E731
 
@@ -383,3 +394,68 @@ class TestAuditChain:
         # Nothing gated, nothing validated, nothing recorded.
         assert message.tool_calls[0].name == "get_user_details"
         assert state.chain.records == ()
+
+
+class TestApprovalPoliciesEndToEnd:
+    """The deciders from harness/approval.py, wired into a real session.
+
+    The point of the pair below: the trigger rate is identical in both -- the
+    gate fires on every write either way -- while the pass rate is 0 in one and
+    1 in the other. That is the whole reason the two numbers are reported apart.
+    """
+
+    CANCEL_IS_EXPECTED = GroundTruth(
+        task_id="fixture",
+        actions=(
+            ExpectedAction(
+                action_id="a1",
+                name="cancel_pending_order",
+                arguments={"order_id": "#W7387996"},
+                compare_args=("order_id",),
+            ),
+        ),
+    )
+    NOTHING_IS_EXPECTED = GroundTruth(task_id="fixture")
+
+    def run_cancel(self, env, retail_db, monkeypatch, truth: GroundTruth):
+        config = HarnessConfig.full(approval=ApprovalConfig(policy=ApprovalPolicy.ORACLE))
+        llm = ScriptedLLM()
+        agent = build(env, retail_db, llm, monkeypatch)
+        agent.approve = make_decider(config, truth=truth)
+        state = verified_scoped(agent, llm, ORDER_PENDING)
+        llm.responses.extend(
+            [
+                calls("cancel_pending_order", "w1", order_id="#W7387996"),
+                says("I am not able to cancel that order."),
+            ]
+        )
+        message, _ = agent.generate_next_message(
+            UserMessage(role="user", content="cancel it"), state
+        )
+        writes = {s.name for s in agent.gate.catalogue.values() if s.kind is ToolKind.WRITE}
+        return message, summarise_approvals(state.chain.records, write_tools=writes, truth=truth)
+
+    def test_an_off_trajectory_write_is_rejected_by_the_oracle(
+        self, env, retail_db, monkeypatch
+    ):
+        message, report = self.run_cancel(
+            env, retail_db, monkeypatch, self.NOTHING_IS_EXPECTED
+        )
+        assert message.content == "I am not able to cancel that order."
+        assert report.gate.gate_trigger_rate == 1.0
+        assert report.gate.approval_pass_rate == 0.0
+        assert report.quality is not None
+        assert (report.quality.caught, report.quality.over_interruption) == (1, 0)
+
+    def test_an_on_trajectory_write_is_approved_and_handed_over(
+        self, env, retail_db, monkeypatch
+    ):
+        message, report = self.run_cancel(
+            env, retail_db, monkeypatch, self.CANCEL_IS_EXPECTED
+        )
+        assert message.tool_calls[0].name == "cancel_pending_order"
+        assert report.gate.gate_trigger_rate == 1.0
+        assert report.gate.approval_pass_rate == 1.0
+        assert report.quality is not None
+        assert (report.quality.caught, report.quality.over_interruption) == (0, 1)
+        assert report.quality.missed == 0
