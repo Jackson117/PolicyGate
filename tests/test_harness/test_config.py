@@ -20,11 +20,21 @@ class TestArms:
     def test_baseline_enables_nothing(self):
         assert HarnessConfig.baseline().enabled_ablation_switches() == ()
 
-    def test_full_enables_every_switch_except_deferred_ones(self):
+    def test_full_only_claims_mechanisms_that_exist(self):
+        """A recorded arm must not name a switch with no implementation behind it.
+
+        Idempotency is deferred past W3 (W1 saw zero duplicate write calls); the
+        other three have switches but no module yet. Move a name out of this set
+        in the same commit as the module that implements it.
+        """
         full = HarnessConfig.full()
         off = set(HarnessConfig.ablation_switches()) - set(full.enabled_ablation_switches())
-        # Idempotency is deferred past W3: W1 saw zero duplicate write calls.
-        assert off == {"idempotency_enabled"}
+        assert off == {
+            "idempotency_enabled",
+            "classified_retry_enabled",
+            "compensation_enabled",
+            "loop_guards_enabled",
+        }
 
     def test_arms_are_immutable(self):
         with pytest.raises(ValidationError):
@@ -116,3 +126,4 @@ class TestLoopGuards:
         # Longest W1 run was 13 tool calls; a guard that trips on normal work
         # would be scored as a harness effect.
         assert LoopGuardConfig().max_tool_calls > 13
+

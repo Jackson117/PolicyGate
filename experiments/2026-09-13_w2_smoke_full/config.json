@@ -1,0 +1,85 @@
+{
+  "run": {
+    "domain": "retail",
+    "task_set_name": null,
+    "task_split_name": "base",
+    "task_ids": [
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "11",
+      "13"
+    ],
+    "num_tasks": null,
+    "llm_user": "openai/gpt-4.1-mini",
+    "llm_args_user": {
+      "temperature": 0.0
+    },
+    "num_trials": 1,
+    "max_errors": 10,
+    "timeout": null,
+    "save_to": "2026-09-13_w2_smoke_full_1789306807",
+    "max_concurrency": 2,
+    "workers": 0,
+    "provider_limits": null,
+    "seed": 42,
+    "log_level": "ERROR",
+    "verbose_logs": false,
+    "max_retries": 3,
+    "retry_delay": 1.0,
+    "auto_resume": false,
+    "auto_review": false,
+    "review_mode": "full",
+    "review_model": "claude-opus-4-5",
+    "hallucination_retries": 0,
+    "is_remote": false,
+    "retrieval_config": null,
+    "retrieval_config_kwargs": null,
+    "agent": "policygate_agent",
+    "llm_agent": "openai/gpt-4.1-mini",
+    "llm_args_agent": {
+      "temperature": 0.0
+    },
+    "user": "user_simulator",
+    "max_steps": 100,
+    "enforce_communication_protocol": false,
+    "text_streaming_config": null
+  },
+  "harness": {
+    "name": "full",
+    "gating_enabled": true,
+    "context_pruning_enabled": true,
+    "schema_check_enabled": true,
+    "value_canonicalization_enabled": true,
+    "referent_uniqueness_enabled": true,
+    "precondition_check_enabled": true,
+    "parallel_call_block_enabled": true,
+    "idempotency_enabled": false,
+    "classified_retry_enabled": false,
+    "compensation_enabled": false,
+    "approval_gate_enabled": true,
+    "approval": {
+      "policy": "auto_approve",
+      "noise_rate": 0.0,
+      "require_for_kinds": [
+        "write"
+      ]
+    },
+    "audit_enabled": true,
+    "loop_guards": {
+      "max_tool_calls": 40,
+      "max_wall_clock_seconds": 600.0,
+      "max_repeated_actions": 3
+    },
+    "loop_guards_enabled": false,
+    "seed": 0
+  },
+  "max_internal_attempts": 3
+}

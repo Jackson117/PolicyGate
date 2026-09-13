@@ -1,0 +1,331 @@
+{
+  "arm": "full",
+  "simulations": 12,
+  "agents_built": 12,
+  "agents_never_used": 0,
+  "wallclock_seconds": 227.32439970970154,
+  "reward_mean": 0.25,
+  "rewards": [
+    1.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "termination_reasons": {
+    "TerminationReason.USER_STOP": 12
+  },
+  "cost": {
+    "tau2_agent_cost": 0.11655,
+    "tau2_user_cost": 0.028961599999999997,
+    "agent_llm_cost_including_refused": 0.134904,
+    "hidden_retry_cost": 0.018353999999999995,
+    "note": "litellm prices at OpenAI list rates, not the AIHubMix bill"
+  },
+  "denials_by_rule": {
+    "validation.refused": 8,
+    "gating.one_call_per_turn": 41
+  },
+  "chains_intact": true,
+  "infrastructure_errors": [],
+  "sessions": [
+    {
+      "task_id": "1",
+      "session_id": "ce5281f2-2cb1-4f28-ab95-e1c704b20c1d",
+      "proposals": 13,
+      "llm_cost_including_refused": 0.011100000000000002,
+      "records": 11,
+      "chain_intact": true,
+      "denials_by_rule": {
+        "validation.refused": 1
+      },
+      "executed": 1,
+      "gate": {
+        "writes_seen": 2,
+        "stopped_upstream": 1,
+        "reached_gate": 1,
+        "gate_fired": 1,
+        "approved": 1,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 1
+      },
+      "gate_trigger_rate": 1.0,
+      "approval_pass_rate": 1.0
+    },
+    {
+      "task_id": "0",
+      "session_id": "bffa33b2-7406-4de8-9e45-b9a75641b4e7",
+      "proposals": 10,
+      "llm_cost_including_refused": 0.0078488,
+      "records": 10,
+      "chain_intact": true,
+      "denials_by_rule": {
+        "gating.one_call_per_turn": 2
+      },
+      "executed": 1,
+      "gate": {
+        "writes_seen": 1,
+        "stopped_upstream": 0,
+        "reached_gate": 1,
+        "gate_fired": 1,
+        "approved": 1,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 1
+      },
+      "gate_trigger_rate": 1.0,
+      "approval_pass_rate": 1.0
+    },
+    {
+      "task_id": "2",
+      "session_id": "0781ef84-bbdb-4669-8865-49a51e8fa4a4",
+      "proposals": 15,
+      "llm_cost_including_refused": 0.013123199999999998,
+      "records": 16,
+      "chain_intact": true,
+      "denials_by_rule": {
+        "gating.one_call_per_turn": 5
+      },
+      "executed": 1,
+      "gate": {
+        "writes_seen": 1,
+        "stopped_upstream": 0,
+        "reached_gate": 1,
+        "gate_fired": 1,
+        "approved": 1,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 1
+      },
+      "gate_trigger_rate": 1.0,
+      "approval_pass_rate": 1.0
+    },
+    {
+      "task_id": "3",
+      "session_id": "03e9c503-20d4-41ee-b936-8ec7a47fe958",
+      "proposals": 19,
+      "llm_cost_including_refused": 0.015222799999999998,
+      "records": 17,
+      "chain_intact": true,
+      "denials_by_rule": {
+        "gating.one_call_per_turn": 5,
+        "validation.refused": 2
+      },
+      "executed": 0,
+      "gate": {
+        "writes_seen": 2,
+        "stopped_upstream": 2,
+        "reached_gate": 0,
+        "gate_fired": 0,
+        "approved": 0,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 0
+      },
+      "gate_trigger_rate": null,
+      "approval_pass_rate": null
+    },
+    {
+      "task_id": "4",
+      "session_id": "5d130f20-2141-497b-a77e-b63eaef68257",
+      "proposals": 20,
+      "llm_cost_including_refused": 0.0208912,
+      "records": 17,
+      "chain_intact": true,
+      "denials_by_rule": {
+        "gating.one_call_per_turn": 5,
+        "validation.refused": 3
+      },
+      "executed": 0,
+      "gate": {
+        "writes_seen": 3,
+        "stopped_upstream": 3,
+        "reached_gate": 0,
+        "gate_fired": 0,
+        "approved": 0,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 0
+      },
+      "gate_trigger_rate": null,
+      "approval_pass_rate": null
+    },
+    {
+      "task_id": "5",
+      "session_id": "d9f27d74-63ec-4e67-b137-27306f9e4727",
+      "proposals": 13,
+      "llm_cost_including_refused": 0.011071999999999999,
+      "records": 10,
+      "chain_intact": true,
+      "denials_by_rule": {
+        "gating.one_call_per_turn": 5
+      },
+      "executed": 0,
+      "gate": {
+        "writes_seen": 0,
+        "stopped_upstream": 0,
+        "reached_gate": 0,
+        "gate_fired": 0,
+        "approved": 0,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 0
+      },
+      "gate_trigger_rate": null,
+      "approval_pass_rate": null
+    },
+    {
+      "task_id": "6",
+      "session_id": "6d1fc98a-2068-4976-bd2c-17dbba1aa235",
+      "proposals": 14,
+      "llm_cost_including_refused": 0.0107116,
+      "records": 14,
+      "chain_intact": true,
+      "denials_by_rule": {
+        "gating.one_call_per_turn": 5
+      },
+      "executed": 1,
+      "gate": {
+        "writes_seen": 1,
+        "stopped_upstream": 0,
+        "reached_gate": 1,
+        "gate_fired": 1,
+        "approved": 1,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 1
+      },
+      "gate_trigger_rate": 1.0,
+      "approval_pass_rate": 1.0
+    },
+    {
+      "task_id": "7",
+      "session_id": "6c2a8e62-80e1-497e-9ff1-46ba1480b8d9",
+      "proposals": 13,
+      "llm_cost_including_refused": 0.0093612,
+      "records": 10,
+      "chain_intact": true,
+      "denials_by_rule": {
+        "gating.one_call_per_turn": 5
+      },
+      "executed": 0,
+      "gate": {
+        "writes_seen": 0,
+        "stopped_upstream": 0,
+        "reached_gate": 0,
+        "gate_fired": 0,
+        "approved": 0,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 0
+      },
+      "gate_trigger_rate": null,
+      "approval_pass_rate": null
+    },
+    {
+      "task_id": "8",
+      "session_id": "9899c070-f2a8-4d8d-bf2a-210fd9bd37c2",
+      "proposals": 16,
+      "llm_cost_including_refused": 0.0115588,
+      "records": 8,
+      "chain_intact": true,
+      "denials_by_rule": {
+        "gating.one_call_per_turn": 2
+      },
+      "executed": 0,
+      "gate": {
+        "writes_seen": 0,
+        "stopped_upstream": 0,
+        "reached_gate": 0,
+        "gate_fired": 0,
+        "approved": 0,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 0
+      },
+      "gate_trigger_rate": null,
+      "approval_pass_rate": null
+    },
+    {
+      "task_id": "9",
+      "session_id": "03b4a8eb-3074-4e19-89d6-29dc458704a1",
+      "proposals": 11,
+      "llm_cost_including_refused": 0.010309599999999999,
+      "records": 7,
+      "chain_intact": true,
+      "denials_by_rule": {
+        "gating.one_call_per_turn": 3
+      },
+      "executed": 0,
+      "gate": {
+        "writes_seen": 0,
+        "stopped_upstream": 0,
+        "reached_gate": 0,
+        "gate_fired": 0,
+        "approved": 0,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 0
+      },
+      "gate_trigger_rate": null,
+      "approval_pass_rate": null
+    },
+    {
+      "task_id": "11",
+      "session_id": "95873dfd-f6b7-4084-8b67-58f80153be97",
+      "proposals": 13,
+      "llm_cost_including_refused": 0.004961199999999999,
+      "records": 7,
+      "chain_intact": true,
+      "denials_by_rule": {
+        "gating.one_call_per_turn": 2
+      },
+      "executed": 0,
+      "gate": {
+        "writes_seen": 0,
+        "stopped_upstream": 0,
+        "reached_gate": 0,
+        "gate_fired": 0,
+        "approved": 0,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 0
+      },
+      "gate_trigger_rate": null,
+      "approval_pass_rate": null
+    },
+    {
+      "task_id": "13",
+      "session_id": "ab0ee681-3a8e-4e47-9d0d-56e7669bfa3e",
+      "proposals": 15,
+      "llm_cost_including_refused": 0.008743599999999999,
+      "records": 9,
+      "chain_intact": true,
+      "denials_by_rule": {
+        "gating.one_call_per_turn": 2,
+        "validation.refused": 2
+      },
+      "executed": 0,
+      "gate": {
+        "writes_seen": 2,
+        "stopped_upstream": 2,
+        "reached_gate": 0,
+        "gate_fired": 0,
+        "approved": 0,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 0
+      },
+      "gate_trigger_rate": null,
+      "approval_pass_rate": null
+    }
+  ]
+}

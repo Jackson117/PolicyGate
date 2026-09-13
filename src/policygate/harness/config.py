@@ -178,11 +178,12 @@ class HarnessConfig(BaseModel):
             "referent_uniqueness_enabled": True,
             "precondition_check_enabled": True,
             "parallel_call_block_enabled": True,
-            "classified_retry_enabled": True,
-            "compensation_enabled": True,
             "approval_gate_enabled": True,
             "audit_enabled": True,
-            "loop_guards_enabled": True,
+            # Off until their modules exist: classified_retry, compensation and
+            # loop_guards have switches but no implementation, and idempotency is
+            # deferred by schedule. An arm whose recorded config claims a
+            # mechanism that did nothing is a mislabelled row.
         }
         return cls(**(defaults | overrides))
 

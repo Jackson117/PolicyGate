@@ -1,0 +1,301 @@
+{
+  "arm": "baseline",
+  "simulations": 12,
+  "agents_built": 12,
+  "agents_never_used": 0,
+  "wallclock_seconds": 208.19404196739197,
+  "reward_mean": 0.3333333333333333,
+  "rewards": [
+    1.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0
+  ],
+  "termination_reasons": {
+    "TerminationReason.USER_STOP": 12
+  },
+  "cost": {
+    "tau2_agent_cost": 0.10474,
+    "tau2_user_cost": 0.0283292,
+    "agent_llm_cost_including_refused": 0.10474,
+    "hidden_retry_cost": 0.0,
+    "note": "litellm prices at OpenAI list rates, not the AIHubMix bill"
+  },
+  "denials_by_rule": {},
+  "chains_intact": true,
+  "infrastructure_errors": [],
+  "sessions": [
+    {
+      "task_id": "0",
+      "session_id": "99f057b6-e422-4959-8160-cfc175a1d894",
+      "proposals": 9,
+      "llm_cost_including_refused": 0.0063456,
+      "records": 0,
+      "chain_intact": true,
+      "denials_by_rule": {},
+      "executed": 0,
+      "gate": {
+        "writes_seen": 0,
+        "stopped_upstream": 0,
+        "reached_gate": 0,
+        "gate_fired": 0,
+        "approved": 0,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 0
+      },
+      "gate_trigger_rate": null,
+      "approval_pass_rate": null
+    },
+    {
+      "task_id": "1",
+      "session_id": "6af60e63-981d-49b9-8c37-2cd0895bcc32",
+      "proposals": 10,
+      "llm_cost_including_refused": 0.0084516,
+      "records": 0,
+      "chain_intact": true,
+      "denials_by_rule": {},
+      "executed": 0,
+      "gate": {
+        "writes_seen": 0,
+        "stopped_upstream": 0,
+        "reached_gate": 0,
+        "gate_fired": 0,
+        "approved": 0,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 0
+      },
+      "gate_trigger_rate": null,
+      "approval_pass_rate": null
+    },
+    {
+      "task_id": "2",
+      "session_id": "1b1ba391-0b96-4146-aa20-a14e18a4f0af",
+      "proposals": 10,
+      "llm_cost_including_refused": 0.0078516,
+      "records": 0,
+      "chain_intact": true,
+      "denials_by_rule": {},
+      "executed": 0,
+      "gate": {
+        "writes_seen": 0,
+        "stopped_upstream": 0,
+        "reached_gate": 0,
+        "gate_fired": 0,
+        "approved": 0,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 0
+      },
+      "gate_trigger_rate": null,
+      "approval_pass_rate": null
+    },
+    {
+      "task_id": "3",
+      "session_id": "a65f1234-48a5-4029-a5d2-1e5606e7dfdd",
+      "proposals": 10,
+      "llm_cost_including_refused": 0.009267599999999999,
+      "records": 0,
+      "chain_intact": true,
+      "denials_by_rule": {},
+      "executed": 0,
+      "gate": {
+        "writes_seen": 0,
+        "stopped_upstream": 0,
+        "reached_gate": 0,
+        "gate_fired": 0,
+        "approved": 0,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 0
+      },
+      "gate_trigger_rate": null,
+      "approval_pass_rate": null
+    },
+    {
+      "task_id": "4",
+      "session_id": "55793719-cc94-40a1-abe5-768627841de9",
+      "proposals": 8,
+      "llm_cost_including_refused": 0.0073568,
+      "records": 0,
+      "chain_intact": true,
+      "denials_by_rule": {},
+      "executed": 0,
+      "gate": {
+        "writes_seen": 0,
+        "stopped_upstream": 0,
+        "reached_gate": 0,
+        "gate_fired": 0,
+        "approved": 0,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 0
+      },
+      "gate_trigger_rate": null,
+      "approval_pass_rate": null
+    },
+    {
+      "task_id": "5",
+      "session_id": "cce2d52a-9d23-4d43-8fe9-6e2dfc4152c5",
+      "proposals": 11,
+      "llm_cost_including_refused": 0.009035999999999999,
+      "records": 0,
+      "chain_intact": true,
+      "denials_by_rule": {},
+      "executed": 0,
+      "gate": {
+        "writes_seen": 0,
+        "stopped_upstream": 0,
+        "reached_gate": 0,
+        "gate_fired": 0,
+        "approved": 0,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 0
+      },
+      "gate_trigger_rate": null,
+      "approval_pass_rate": null
+    },
+    {
+      "task_id": "6",
+      "session_id": "a1c47197-1998-426b-b153-ae99d86dc580",
+      "proposals": 14,
+      "llm_cost_including_refused": 0.014152000000000001,
+      "records": 0,
+      "chain_intact": true,
+      "denials_by_rule": {},
+      "executed": 0,
+      "gate": {
+        "writes_seen": 0,
+        "stopped_upstream": 0,
+        "reached_gate": 0,
+        "gate_fired": 0,
+        "approved": 0,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 0
+      },
+      "gate_trigger_rate": null,
+      "approval_pass_rate": null
+    },
+    {
+      "task_id": "7",
+      "session_id": "6dbe2989-9945-47a3-a32f-a637d67c6a00",
+      "proposals": 10,
+      "llm_cost_including_refused": 0.0070907999999999995,
+      "records": 0,
+      "chain_intact": true,
+      "denials_by_rule": {},
+      "executed": 0,
+      "gate": {
+        "writes_seen": 0,
+        "stopped_upstream": 0,
+        "reached_gate": 0,
+        "gate_fired": 0,
+        "approved": 0,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 0
+      },
+      "gate_trigger_rate": null,
+      "approval_pass_rate": null
+    },
+    {
+      "task_id": "8",
+      "session_id": "7e59c393-5cfd-4593-ab69-bfaa6d7baa32",
+      "proposals": 9,
+      "llm_cost_including_refused": 0.0065515999999999994,
+      "records": 0,
+      "chain_intact": true,
+      "denials_by_rule": {},
+      "executed": 0,
+      "gate": {
+        "writes_seen": 0,
+        "stopped_upstream": 0,
+        "reached_gate": 0,
+        "gate_fired": 0,
+        "approved": 0,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 0
+      },
+      "gate_trigger_rate": null,
+      "approval_pass_rate": null
+    },
+    {
+      "task_id": "9",
+      "session_id": "3d418a0a-dc40-471b-8e1e-9ffa2ca90d80",
+      "proposals": 13,
+      "llm_cost_including_refused": 0.0093724,
+      "records": 0,
+      "chain_intact": true,
+      "denials_by_rule": {},
+      "executed": 0,
+      "gate": {
+        "writes_seen": 0,
+        "stopped_upstream": 0,
+        "reached_gate": 0,
+        "gate_fired": 0,
+        "approved": 0,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 0
+      },
+      "gate_trigger_rate": null,
+      "approval_pass_rate": null
+    },
+    {
+      "task_id": "11",
+      "session_id": "1fd4667a-51c5-4969-b25b-9220702c5f0a",
+      "proposals": 10,
+      "llm_cost_including_refused": 0.005406,
+      "records": 0,
+      "chain_intact": true,
+      "denials_by_rule": {},
+      "executed": 0,
+      "gate": {
+        "writes_seen": 0,
+        "stopped_upstream": 0,
+        "reached_gate": 0,
+        "gate_fired": 0,
+        "approved": 0,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 0
+      },
+      "gate_trigger_rate": null,
+      "approval_pass_rate": null
+    },
+    {
+      "task_id": "13",
+      "session_id": "4ae887cd-9117-47a0-b0d2-b87681019848",
+      "proposals": 21,
+      "llm_cost_including_refused": 0.013857999999999999,
+      "records": 0,
+      "chain_intact": true,
+      "denials_by_rule": {},
+      "executed": 0,
+      "gate": {
+        "writes_seen": 0,
+        "stopped_upstream": 0,
+        "reached_gate": 0,
+        "gate_fired": 0,
+        "approved": 0,
+        "rejected": 0,
+        "unresolved": 0,
+        "executed": 0
+      },
+      "gate_trigger_rate": null,
+      "approval_pass_rate": null
+    }
+  ]
+}
