@@ -62,11 +62,25 @@ iCloud 抢得比脚本快。
 
 - agent 基类 `HalfDuplexAgent`，实现 `get_init_state` / `generate_next_message`。
   与 CLAUDE.md 记的一致。
-- **消息格式硬约束**（`base_agent.py: validate_message_format_default`）：
+- **消息格式约束**（`base_agent.py: validate_message_format_default`）：
   一条 `AssistantMessage` 只能**要么**有文本内容**要么**有 tool call，
   两者都有或都没有都判非法。
   → 直接影响审批闸门设计：闸门拦下一个提议的写操作、想跟用户说明时，
   只能返回**纯文本、零 tool call** 的消息。不能一边解释一边调工具。
+
+  > ⚠️ **更正（2026-09-14，W2 写 `eval/violations.py` 时查证）：这条在默认配置下不生效。**
+  > 上面把它记成了「硬约束」，那是只读了函数定义、没查调用点。实际情况：
+  > - `validate_message_format_default` 在编排路径上**没有调用点**；
+  > - orchestrator 真正的检查是 `_check_communication_error`，只在
+  >   `validate_communication` 为真时运行，它来自 `TextRunConfig.enforce_communication_protocol`，
+  >   **默认 `False`**，`w1_baseline.py` 和 `w2_smoke.py` 都没设。
+  >
+  > 实测 W1 的 90 条里 **37 条**含「文本 + tool call」混合消息，全部照常跑完、照常评分。
+  > 这类消息被路由到环境，用户模拟器的历史过滤会丢掉所有带 tool call 的 assistant 消息，
+  > 所以**文本被记进轨迹但从未送达用户**。
+  >
+  > 对设计的影响：拒绝理由包装成 `ToolMessage` 回灌的做法仍然成立（纯文本消息会直达用户），
+  > 但理由不是「tau2 强制」。
 - 编程入口（不必走 CLI）：
   `tau2.runner` 导出 `run_simulation` / `build_agent` / `build_environment` /
   `build_user` / `build_orchestrator` / `get_tasks` / `run_domain` / `run_tasks`。

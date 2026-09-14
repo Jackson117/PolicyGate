@@ -411,8 +411,14 @@ class PairedComparison(BaseModel):
     difference: Estimate
     """Treatment minus control, per task, averaged; tasks resampled as pairs."""
 
-    treatment_better: int
-    control_better: int
+    treatment_higher: int
+    control_higher: int
+    """Tasks where each arm's value was higher.
+
+    Not "better": for pass^k higher is better, for a violation rate it is worse,
+    and a field that bakes in one direction gets read the wrong way for the other.
+    """
+
     ties: int
     p_value: float
     test: PairedTest
@@ -468,11 +474,15 @@ def compare_paired(
     control: ObservationTable,
     *,
     k: int = 1,
+    name: str | None = None,
     level: float = DEFAULT_LEVEL,
     resamples: int = DEFAULT_RESAMPLES,
     seed: int = 0,
 ) -> PairedComparison:
     """Paired pass^k comparison over the tasks both arms can score.
+
+    Pass ``name`` when the observations are not successes -- a violation table
+    compared under the label "pass^1" invites exactly the wrong reading.
 
     A task is compared only if both arms have at least k trials for it. Tasks
     dropped for any reason are named in the result, per arm, because an
@@ -492,12 +502,13 @@ def compare_paired(
     p_value, test = _sign_flip_p(differences, resamples, seed)
 
     in_both = set(t_tasks) & set(c_tasks)
+    statistic = name if name is not None else f"pass^{k}"
     return PairedComparison(
-        statistic=f"pass^{k}",
+        statistic=statistic,
         treatment=math.fsum(treated[t] for t in common) / len(common),
         control=math.fsum(controlled[t] for t in common) / len(common),
         difference=Estimate(
-            statistic=f"pass^{k} difference",
+            statistic=f"{statistic} difference",
             value=math.fsum(differences) / len(differences),
             lo=lo,
             hi=hi,
@@ -505,8 +516,8 @@ def compare_paired(
             n_tasks=len(common),
             resamples=resamples,
         ),
-        treatment_better=sum(1 for d in differences if d > 1e-12),
-        control_better=sum(1 for d in differences if d < -1e-12),
+        treatment_higher=sum(1 for d in differences if d > 1e-12),
+        control_higher=sum(1 for d in differences if d < -1e-12),
         ties=sum(1 for d in differences if abs(d) <= 1e-12),
         p_value=p_value,
         test=test,

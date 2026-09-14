@@ -200,7 +200,7 @@ def test_single_binary_trials_are_tested_with_mcnemar():
     treatment, control = paired_arms(40, both=20, treatment_extra=6, control_extra=1)
     result = compare_paired(treatment, control, resamples=FAST)
     assert result.test is PairedTest.MCNEMAR_EXACT
-    assert (result.treatment_better, result.control_better) == (6, 1)
+    assert (result.treatment_higher, result.control_higher) == (6, 1)
     assert result.p_value == pytest.approx(mcnemar_exact(6, 1))
 
 

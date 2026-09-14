@@ -4,13 +4,14 @@ tau2 owns the outer loop and the environment executes tools, so the only place
 the harness can act is between the model emitting a call and this adapter
 returning an ``AssistantMessage``. Everything happens in that gap.
 
-**Refusals never reach the user.** tau2 requires an assistant message to carry
-either text or tool calls, never both, so a refusal expressed as text would be
-delivered to the user simulator -- exposing harness internals and spending the
-turn. Instead the refusal is appended to the model's own history as a
-``ToolMessage`` with ``error=True`` and the model is asked again, inside this
-method, invisibly to the orchestrator. The shape is one the model already
-handles: W1 recorded 52 real tool errors and the model adjusted to them.
+**Refusals never reach the user.** A refusal returned as a text-only message
+would be routed to the user simulator -- exposing harness internals and spending
+the turn. (tau2's "text or tool calls, never both" rule is only checked when
+``enforce_communication_protocol`` is set, which it is not by default; see
+``eval/violations.py``.) Instead the refusal is appended to the model's own
+history as a ``ToolMessage`` with ``error=True`` and the model is asked again,
+inside this method, invisibly to the orchestrator. The shape is one the model
+already handles: W1 recorded 52 real tool errors and the model adjusted to them.
 
 A refusal is not a tool error, though, and the audit chain keeps them apart:
 ``TOOL_DENIED`` means the call never ran, ``TOOL_EXECUTED`` means the
