@@ -83,6 +83,13 @@ class TestVisibilityByState:
 
 
 class TestDisabledGatingIsAGenuineControl:
+    def test_state_tools_ignore_the_switch_so_pruning_can_run_alone(self):
+        """Pruning reads state_tools; before the split it pruned nothing without gating."""
+        off = ToolGate(RETAIL_CATALOGUE, HarnessConfig.baseline())
+        on = gate()
+        for state in SessionState:
+            assert off.state_tools(state) == on.visible_tools(state)
+
     def test_everything_is_visible_in_every_state(self):
         g = gate(gating_enabled=False)
         for state in SessionState:

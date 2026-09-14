@@ -15,6 +15,7 @@ from tau2.registry import registry
 from policygate.adapters.tool_mapping import (
     RETAIL_ESCALATION,
     RETAIL_IDENTITY_LOOKUPS,
+    argument_schemas,
     ground_truth,
     retail_constraints,
     retail_facts,
@@ -27,6 +28,11 @@ from policygate.harness.types import ToolCall, ToolKind, ToolRole
 @pytest.fixture(scope="module")
 def toolkit():
     return registry.get_env_constructor("retail")().tools
+
+
+@pytest.fixture(scope="module")
+def tools():
+    return registry.get_env_constructor("retail")().get_tools()
 
 
 @pytest.fixture(scope="module")
@@ -138,38 +144,70 @@ class TestRetailFacts:
         assert facts.objects[0].attributes["status"] == order.status
 
 
+class TestArgumentSchemas:
+    def test_cancel_requires_its_reason(self, tools):
+        """The hand-written schema omitted it and refused every correct cancellation."""
+        schema = argument_schemas(tools)["cancel_pending_order"]
+        assert schema.required == frozenset({"order_id", "reason"})
+        assert schema.optional == frozenset()
+
+    def test_every_tool_gets_a_schema_matching_what_the_model_is_shown(self, tools):
+        schemas = argument_schemas(tools)
+        assert set(schemas) == {t.name for t in tools}
+        for tool in tools:
+            parameters = tool.openai_schema["function"].get("parameters") or {}
+            assert schemas[tool.name].known == frozenset(parameters.get("properties") or {})
+            assert schemas[tool.name].required == frozenset(parameters.get("required") or ())
+
+    def test_a_correct_cancellation_passes_the_schema_check(self, retail_db, tools):
+        from policygate.harness.config import HarnessConfig
+        from policygate.harness.validation import Validator
+
+        validator = Validator(
+            retail_constraints(retail_db, tools=tools), HarnessConfig.only("schema_check_enabled")
+        )
+        correct = ToolCall(
+            id="c", name="cancel_pending_order",
+            arguments={"order_id": "#W1", "reason": "no longer needed"},
+        )
+        incomplete = ToolCall(id="c", name="cancel_pending_order", arguments={"order_id": "#W1"})
+        assert validator.review(correct).passed
+        assert not validator.review(incomplete).passed
+
+
 class TestRetailConstraints:
-    def test_canonical_values_are_read_from_the_database(self, retail_db):
-        constraints = retail_constraints(retail_db)
+    def test_canonical_values_are_read_from_the_database(self, retail_db, tools):
+        constraints = retail_constraints(retail_db, tools=tools)
         by_field = {c.field: c for c in constraints.value_constraints}
         assert by_field["country"].allowed == frozenset({"USA"})
         assert all(len(s) == 2 for s in by_field["state"].allowed)
 
-    def test_the_arguments_task_22_wrote_are_not_canonical(self, retail_db):
-        by_field = {c.field: c for c in retail_constraints(retail_db).value_constraints}
+    def test_the_arguments_task_22_wrote_are_not_canonical(self, retail_db, tools):
+        constraints = retail_constraints(retail_db, tools=tools)
+        by_field = {c.field: c for c in constraints.value_constraints}
         assert by_field["country"].canonical_for("United States") == "USA"
         assert by_field["state"].canonical_for("New York") == "NY"
 
-    def test_preconditions_match_the_policy_text(self, retail_db):
-        by_tool = {p.tool: p for p in retail_constraints(retail_db).preconditions}
+    def test_preconditions_match_the_policy_text(self, retail_db, tools):
+        by_tool = {p.tool: p for p in retail_constraints(retail_db, tools=tools).preconditions}
         assert by_tool["cancel_pending_order"].allowed_values == frozenset({"pending"})
         assert by_tool["return_delivered_order_items"].allowed_values == frozenset({"delivered"})
         assert by_tool["exchange_delivered_order_items"].allowed_values == frozenset({"delivered"})
 
-    def test_every_precondition_cites_the_policy(self, retail_db):
-        preconditions = retail_constraints(retail_db).preconditions
+    def test_every_precondition_cites_the_policy(self, retail_db, tools):
+        preconditions = retail_constraints(retail_db, tools=tools).preconditions
         assert all(p.clause.doc_id == "retail/policy.md" for p in preconditions)
 
-    def test_every_order_write_declares_its_referent_field(self, retail_db):
+    def test_every_order_write_declares_its_referent_field(self, retail_db, tools):
         from tau2.metrics.break_down_metrics import get_write_tools
 
         agent_writes, _ = get_write_tools("retail")
-        declared = set(retail_constraints(retail_db).referent_fields)
+        declared = set(retail_constraints(retail_db, tools=tools).referent_fields)
         # modify_user_address acts on the user, not on an order.
         assert agent_writes - declared == {"modify_user_address"}
 
     def test_an_empty_database_yields_no_value_constraints(self):
-        assert retail_constraints({}).value_constraints == ()
+        assert retail_constraints({}, tools=()).value_constraints == ()
 
 
 # --- ground truth ---------------------------------------------------------

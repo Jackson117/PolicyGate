@@ -111,7 +111,7 @@ class ToolGate:
     # --- prevention --------------------------------------------------------
 
     def visible_tools(self, state: SessionState) -> frozenset[str]:
-        """Tool names the model may be shown in ``state``.
+        """Tool names a call may use in ``state`` -- what enforcement admits.
 
         With gating off this is the whole catalogue, which is what makes the
         baseline arm a genuine control rather than a differently-configured
@@ -119,7 +119,16 @@ class ToolGate:
         """
         if not self._config.gating_enabled:
             return frozenset(self._tools)
+        return self.state_tools(state)
 
+    def state_tools(self, state: SessionState) -> frozenset[str]:
+        """Tool names that fit ``state``, whatever the gating switch says.
+
+        Split from :meth:`visible_tools` so that context pruning -- hiding
+        schemas from the model -- can run without gating, which refuses calls.
+        Before the split pruning read the switched method, so an arm with
+        pruning on and gating off pruned nothing, and could not be measured.
+        """
         if state in (SessionState.TRANSFERRED, SessionState.PENDING_APPROVAL):
             # Terminal, or frozen awaiting a decision. Nothing proceeds -- not
             # even escalation, because the adapter resolves the pending approval

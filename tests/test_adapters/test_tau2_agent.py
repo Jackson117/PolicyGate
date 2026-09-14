@@ -96,12 +96,17 @@ def build(env, retail_db, llm: ScriptedLLM, monkeypatch, **overrides) -> Harness
         catalogue=tool_specs(
             env.tools, identity_lookups=RETAIL_IDENTITY_LOOKUPS, escalation=RETAIL_ESCALATION
         ),
-        constraints=retail_constraints(retail_db),
+        constraints=retail_constraints(retail_db, tools=env.get_tools()),
         extract_facts=retail_facts,
         config=HarnessConfig.full(**overrides),
         clock=CLOCK,
         session_id="s1",
     )
+
+
+def cancels(order_id: str, call_id: str = "w1") -> AssistantMessage:
+    """A cancellation in the shape the real tool requires: order and reason both."""
+    return calls("cancel_pending_order", call_id, order_id=order_id, reason="no longer needed")
 
 
 def tool_result(call_id: str, content: str, error: bool = False) -> ToolMessage:
@@ -234,7 +239,7 @@ class TestValidationRefusals:
         state = verified_scoped(agent, llm)
         llm.responses.extend(
             [
-                calls("cancel_pending_order", "w1", order_id="#12345"),
+                cancels("#12345"),
                 says("Which order did you mean?"),
             ]
         )
@@ -252,7 +257,7 @@ class TestValidationRefusals:
         state = verified_scoped(agent, llm)  # #W5490111 is delivered
         llm.responses.extend(
             [
-                calls("cancel_pending_order", "w1", order_id="#W5490111"),
+                cancels("#W5490111"),
                 says("That order has already been delivered."),
             ]
         )
@@ -262,11 +267,13 @@ class TestValidationRefusals:
 
 
 class TestApprovalGate:
+    """The gate is off in every experiment arm, so these switch it on explicitly."""
+
     def test_an_approved_write_is_handed_to_the_environment(self, env, retail_db, monkeypatch):
         llm = ScriptedLLM()
-        agent = build(env, retail_db, llm, monkeypatch)
+        agent = build(env, retail_db, llm, monkeypatch, approval_gate_enabled=True)
         state = verified_scoped(agent, llm, ORDER_PENDING)
-        llm.responses.append(calls("cancel_pending_order", "w1", order_id="#W7387996"))
+        llm.responses.append(cancels("#W7387996"))
         message, _ = agent.generate_next_message(
             UserMessage(role="user", content="cancel it"), state
         )
@@ -285,12 +292,12 @@ class TestApprovalGate:
             )
 
         llm = ScriptedLLM()
-        agent = build(env, retail_db, llm, monkeypatch)
+        agent = build(env, retail_db, llm, monkeypatch, approval_gate_enabled=True)
         agent.approve = always_reject
         state = verified_scoped(agent, llm, ORDER_PENDING)
         llm.responses.extend(
             [
-                calls("cancel_pending_order", "w1", order_id="#W7387996"),
+                cancels("#W7387996"),
                 says("I cannot cancel that for you."),
             ]
         )
@@ -299,11 +306,11 @@ class TestApprovalGate:
         )
         assert message.content == "I cannot cancel that for you."
 
-    def test_the_gate_can_be_switched_off(self, env, retail_db, monkeypatch):
+    def test_the_full_arm_does_not_ask(self, env, retail_db, monkeypatch):
         llm = ScriptedLLM()
-        agent = build(env, retail_db, llm, monkeypatch, approval_gate_enabled=False)
+        agent = build(env, retail_db, llm, monkeypatch)
         state = verified_scoped(agent, llm, ORDER_PENDING)
-        llm.responses.append(calls("cancel_pending_order", "w1", order_id="#W7387996"))
+        llm.responses.append(cancels("#W7387996"))
         agent.generate_next_message(UserMessage(role="user", content="cancel it"), state)
         assert AuditEvent.APPROVAL_REQUESTED not in [r.event for r in state.chain.records]
 
@@ -343,7 +350,7 @@ class TestAuditChain:
         llm = ScriptedLLM()
         agent = build(env, retail_db, llm, monkeypatch)
         state = verified_scoped(agent, llm, ORDER_PENDING)
-        llm.responses.append(calls("cancel_pending_order", "w1", order_id="#W7387996"))
+        llm.responses.append(cancels("#W7387996"))
         agent.generate_next_message(UserMessage(role="user", content="cancel it"), state)
         assert state.chain.verify().intact is True
 
@@ -354,7 +361,7 @@ class TestAuditChain:
         agent = build(env, retail_db, llm, monkeypatch)
         state = verified_scoped(agent, llm, ORDER_PENDING)
         llm.responses.extend(
-            [calls("cancel_pending_order", "w1", order_id="#W7387996"), says("done")]
+            [cancels("#W7387996"), says("done")]
         )
         agent.generate_next_message(UserMessage(role="user", content="cancel it"), state)
         agent.generate_next_message(
@@ -367,7 +374,7 @@ class TestAuditChain:
         agent = build(env, retail_db, llm, monkeypatch)
         state = verified_scoped(agent, llm, ORDER_PENDING)
         llm.responses.extend(
-            [calls("cancel_pending_order", "w1", order_id="#W7387996"), says("hm")]
+            [cancels("#W7387996"), says("hm")]
         )
         agent.generate_next_message(UserMessage(role="user", content="cancel it"), state)
         agent.generate_next_message(tool_result("w1", "Error: Order not found", error=True), state)
@@ -383,7 +390,7 @@ class TestAuditChain:
             catalogue=tool_specs(
                 env.tools, identity_lookups=RETAIL_IDENTITY_LOOKUPS, escalation=RETAIL_ESCALATION
             ),
-            constraints=retail_constraints(retail_db),
+            constraints=retail_constraints(retail_db, tools=env.get_tools()),
             extract_facts=retail_facts,
             config=HarnessConfig.baseline(),
             clock=CLOCK,
@@ -420,12 +427,12 @@ class TestApprovalPoliciesEndToEnd:
     def run_cancel(self, env, retail_db, monkeypatch, truth: GroundTruth):
         config = HarnessConfig.full(approval=ApprovalConfig(policy=ApprovalPolicy.ORACLE))
         llm = ScriptedLLM()
-        agent = build(env, retail_db, llm, monkeypatch)
+        agent = build(env, retail_db, llm, monkeypatch, approval_gate_enabled=True)
         agent.approve = make_decider(config, truth=truth)
         state = verified_scoped(agent, llm, ORDER_PENDING)
         llm.responses.extend(
             [
-                calls("cancel_pending_order", "w1", order_id="#W7387996"),
+                cancels("#W7387996"),
                 says("I am not able to cancel that order."),
             ]
         )
@@ -459,3 +466,130 @@ class TestApprovalPoliciesEndToEnd:
         assert report.quality is not None
         assert (report.quality.caught, report.quality.over_interruption) == (0, 1)
         assert report.quality.missed == 0
+
+
+class TestEachSwitchWorksAlone:
+    """Every ablatable switch, turned on by itself, must change what the agent does.
+
+    The ablation compares each ``only_<switch>`` arm with the baseline. A switch
+    that silently depends on another is flat by construction in that design --
+    context pruning was, because it read gating's switched visibility -- and a
+    flat row would be reported as "no effect" when nothing was measured.
+
+    Each scenario drives the baseline and the single-switch arm through the same
+    script and asserts on the one observable the switch should move.
+    """
+
+    FALLBACK = [says("Let me try something else."), says("Could you clarify?")]
+
+    def drive(self, env, retail_db, monkeypatch, config, steps):
+        """Run (incoming message, scripted proposal) pairs; return the agent, state and llm."""
+        llm = ScriptedLLM()
+        monkeypatch.setattr(agent_module, "generate", llm)
+        agent = HarnessAgent(
+            tools=env.get_tools(),
+            domain_policy=env.get_policy(),
+            llm="scripted",
+            catalogue=tool_specs(
+                env.tools, identity_lookups=RETAIL_IDENTITY_LOOKUPS, escalation=RETAIL_ESCALATION
+            ),
+            constraints=retail_constraints(retail_db, tools=env.get_tools()),
+            extract_facts=retail_facts,
+            config=config.model_copy(update={"audit_enabled": True}),
+            clock=CLOCK,
+            session_id="s1",
+        )
+        state = agent.get_init_state()
+        for incoming, proposal in steps:
+            llm.responses = [proposal, *self.FALLBACK]
+            agent.generate_next_message(incoming, state)
+        return agent, state, llm
+
+    @classmethod
+    def denied_with(cls, text: str):
+        return lambda agent, state, llm: any(text in d for d in cls.denials(state))
+
+    @staticmethod
+    def denials(state) -> list[str]:
+        return [
+            f"{r.decision.rule}: {r.decision.reason}"
+            for r in state.chain.records
+            if r.event is AuditEvent.TOOL_DENIED
+        ]
+
+    def scenario(self, switch):
+        hi = UserMessage(role="user", content="hi")
+        order = json.dumps({"order_id": "#W5490111", "status": "delivered", "user_id": "u1"})
+        address = dict(
+            user_id="u1", address1="1 Main St", address2="", city="Albany",
+            state="New York", country="USA", zip="12207",
+        )
+        return {
+            # Reading a profile before any identity lookup.
+            "gating_enabled": (
+                [(hi, calls("get_user_details", "c1", user_id="u1"))],
+                self.denied_with("identity_first"),
+            ),
+            # What the model is shown before anyone is authenticated.
+            "context_pruning_enabled": (
+                [(hi, says("Could I have your email?"))],
+                lambda agent, state, llm: (
+                    len(llm.offered_tool_names[0]) < len(agent._tools_by_name)
+                ),
+            ),
+            # A cancellation without its required reason.
+            "schema_check_enabled": (
+                [(hi, calls("cancel_pending_order", "c1", order_id="#W5490111"))],
+                self.denied_with("requires 'reason'"),
+            ),
+            # "New York" where the database stores "NY".
+            "value_canonicalization_enabled": (
+                [(hi, calls("modify_user_address", "c1", **address))],
+                self.denied_with("state='New York'"),
+            ),
+            # An order id no lookup ever returned.
+            "referent_uniqueness_enabled": (
+                [(hi, cancels("#12345", "c1"))],
+                self.denied_with("#12345"),
+            ),
+            # Cancelling an order the lookup showed as delivered.
+            "precondition_check_enabled": (
+                [
+                    (hi, calls("get_order_details", "o1", order_id="#W5490111")),
+                    (tool_result("o1", order), cancels("#W5490111", "c1")),
+                ],
+                self.denied_with("status="),
+            ),
+            # Two tool calls in one turn.
+            "parallel_call_block_enabled": (
+                [(hi, AssistantMessage(role="assistant", content=None, tool_calls=[
+                    Tau2ToolCall(id="p1", name="find_user_id_by_email",
+                                 arguments={"email": "a@b.c"}),
+                    Tau2ToolCall(id="p2", name="find_user_id_by_email",
+                                 arguments={"email": "d@e.f"}),
+                ]))],
+                self.denied_with("one_call_per_turn"),
+            ),
+        }[switch]
+
+    def test_every_switch_in_the_matrix_has_a_scenario(self):
+        for switch in HarnessConfig.full().enabled_ablation_switches():
+            self.scenario(switch)  # KeyError names the switch that has none
+
+    @pytest.mark.parametrize("switch", HarnessConfig.full().enabled_ablation_switches())
+    def test_the_switch_alone_moves_its_observable(self, env, retail_db, monkeypatch, switch):
+        steps, observed = self.scenario(switch)
+        base = self.drive(env, retail_db, monkeypatch, HarnessConfig.baseline(), steps)
+        alone = self.drive(env, retail_db, monkeypatch, HarnessConfig.only(switch), steps)
+        assert not observed(*base), f"baseline already shows the effect of {switch}"
+        assert observed(*alone), f"{switch} on its own changed nothing"
+
+    def test_pruning_without_gating_hides_but_does_not_refuse(self, env, retail_db, monkeypatch):
+        """Prevention without enforcement: the schema is withheld, the call still runs."""
+        steps = [(UserMessage(role="user", content="hi"),
+                  calls("get_user_details", "c1", user_id="u1"))]
+        agent, state, llm = self.drive(
+            env, retail_db, monkeypatch, HarnessConfig.only("context_pruning_enabled"), steps
+        )
+        assert "get_user_details" not in llm.offered_tool_names[0]
+        assert self.denials(state) == []

@@ -154,12 +154,36 @@ def retail_facts(tool_name: str, content: str | None, *, error: bool = False) ->
     return ExtractedFacts()
 
 
-def retail_constraints(db: Mapping[str, Any]) -> DomainConstraints:
-    """Assemble retail's constraints from its database and policy.
+def argument_schemas(tools: Iterable[Any]) -> dict[str, ArgumentSchema]:
+    """Each tool's arguments, read from the schema tau2 hands the provider.
+
+    Derived, never written by hand. The hand-written version declared
+    ``cancel_pending_order`` as taking only ``order_id``, while its signature is
+    ``(order_id, reason)`` with both required -- so the check refused every
+    correct cancellation and passed every incomplete one. Reading the same JSON
+    schema the model is given means the check and the tool cannot disagree.
+    """
+    schemas: dict[str, ArgumentSchema] = {}
+    for tool in tools:
+        parameters = tool.openai_schema["function"].get("parameters") or {}
+        known = frozenset(parameters.get("properties") or {})
+        required = frozenset(parameters.get("required") or ())
+        schemas[tool.name] = ArgumentSchema(
+            tool=tool.name, required=required, optional=known - required
+        )
+    return schemas
+
+
+def retail_constraints(db: Mapping[str, Any], *, tools: Iterable[Any]) -> DomainConstraints:
+    """Assemble retail's constraints from its database, its tools and its policy.
 
     The canonical value sets are read out of the data rather than asserted: all
     500 users carry ``country="USA"`` and one of thirteen two-letter states, and
     task 22 failed by writing "United States" and "New York" instead.
+
+    ``tools`` is required rather than defaulted: argument schemas come from the
+    tool signatures, and a call site that forgot them would silently switch the
+    schema check off.
     """
     countries: set[str] = set()
     states: set[str] = set()
@@ -221,10 +245,7 @@ def retail_constraints(db: Mapping[str, Any]) -> DomainConstraints:
         value_constraints=value_constraints,
         referent_fields={t: "order_id" for t in order_tools if t != "get_order_details"},
         preconditions=preconditions,
-        schemas={
-            t: ArgumentSchema(tool=t, required=frozenset({"order_id"}))
-            for t in ("cancel_pending_order",)
-        },
+        schemas=argument_schemas(tools),
     )
 
 

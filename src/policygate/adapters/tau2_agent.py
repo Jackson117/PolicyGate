@@ -271,11 +271,13 @@ class HarnessAgent(HalfDuplexAgent[HarnessAgentState]):
 
         Without context pruning the model sees everything and the gate only
         refuses afterwards, which is a different mechanism with a different cost
-        and is switched separately.
+        and is switched separately. With pruning but no gating, the model is
+        shown only what fits the state, yet a call to a hidden tool is not
+        refused -- prevention with no enforcement behind it.
         """
         if not self.config.context_pruning_enabled:
             return list(self._tools_by_name.values())
-        visible = self.gate.visible_tools(state.tracker.state)
+        visible = self.gate.state_tools(state.tracker.state)
         return [t for name, t in self._tools_by_name.items() if name in visible]
 
     # --- reviewing ---------------------------------------------------------

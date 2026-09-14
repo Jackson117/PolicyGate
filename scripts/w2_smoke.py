@@ -95,8 +95,9 @@ def build_factory(args, sessions: list) -> Any:
     from policygate.harness.config import HarnessConfig
 
     db = json.loads((DATA_DIR / "tau2" / "domains" / args.domain / "db.json").read_text())
-    constraints = retail_constraints(db)
-    toolkit = registry.get_env_constructor(args.domain)().tools
+    environment = registry.get_env_constructor(args.domain)()
+    constraints = retail_constraints(db, tools=environment.get_tools())
+    toolkit = environment.tools
     catalogue = tool_specs(
         toolkit, identity_lookups=RETAIL_IDENTITY_LOOKUPS, escalation=RETAIL_ESCALATION
     )

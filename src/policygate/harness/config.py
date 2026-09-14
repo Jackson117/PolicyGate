@@ -79,8 +79,8 @@ class ApprovalConfig(BaseModel):
 class HarnessConfig(BaseModel):
     """Which harness mechanisms are active for a run.
 
-    Construct experiment arms with :meth:`baseline`, :meth:`full` and
-    :meth:`without`; do not hand-assemble arms at call sites, or the recorded
+    Construct experiment arms with :meth:`baseline`, :meth:`full`, :meth:`only`
+    and :meth:`without`; do not hand-assemble arms at call sites, or the recorded
     config and the actual behaviour will drift apart.
     """
 
@@ -130,7 +130,14 @@ class HarnessConfig(BaseModel):
 
     # --- approval gate -----------------------------------------------------
     approval_gate_enabled: bool = False
-    """Pause writes for an approval decision. Not in the model's action space."""
+    """Pause writes for an approval decision. Not in the model's action space.
+
+    Off in every arm and excluded from :meth:`ablation_switches`, by decision.
+    Under the fixed ``auto_approve`` policy the gate cannot change a trajectory
+    -- the decider always says yes and the model never sees it -- so its row
+    would be flat by construction, and varying the decider or the trigger rule
+    was ruled out of scope. The mechanism stays implemented and unit-tested.
+    """
 
     approval: ApprovalConfig = ApprovalConfig()
 
@@ -151,7 +158,7 @@ class HarnessConfig(BaseModel):
 
     # --- arm construction --------------------------------------------------
 
-    NON_ABLATABLE: ClassVar[tuple[str, ...]] = ("audit_enabled",)
+    NON_ABLATABLE: ClassVar[tuple[str, ...]] = ("audit_enabled", "approval_gate_enabled")
     """Switches excluded from the matrix, with the reason stated on each field."""
 
     @classmethod
@@ -178,13 +185,30 @@ class HarnessConfig(BaseModel):
             "referent_uniqueness_enabled": True,
             "precondition_check_enabled": True,
             "parallel_call_block_enabled": True,
-            "approval_gate_enabled": True,
             "audit_enabled": True,
             # Off until their modules exist: classified_retry, compensation and
             # loop_guards have switches but no implementation, and idempotency is
             # deferred by schedule. An arm whose recorded config claims a
-            # mechanism that did nothing is a mislabelled row.
+            # mechanism that did nothing is a mislabelled row. The approval gate
+            # is off by decision; see its field.
         }
+        return cls(**(defaults | overrides))
+
+    @classmethod
+    def only(cls, switch: str, **overrides: object) -> HarnessConfig:
+        """The baseline with exactly one mechanism switched on.
+
+        The arm shape the ablation uses: each mechanism's effect on its own,
+        against the shared baseline. Chosen over leave-one-out because several
+        mechanisms cover for each other -- gating's scope rule and validation's
+        referent check both stop a write to the wrong order -- and removing one
+        from the full stack would hide the effect of both. The price is that
+        the standalone effects need not add up to full minus baseline; the gap
+        is the interaction, and full against baseline stays the headline.
+        """
+        if switch not in cls.ablation_switches():
+            raise ValueError(f"not an ablatable switch: {switch!r}")
+        defaults: dict[str, object] = {"name": f"only_{switch}", switch: True}
         return cls(**(defaults | overrides))
 
     @classmethod

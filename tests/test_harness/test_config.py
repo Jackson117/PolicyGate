@@ -63,7 +63,13 @@ class TestAblationSwitches:
 
     def test_each_core_contribution_has_a_switch(self):
         switches = set(HarnessConfig.ablation_switches())
-        assert {"gating_enabled", "idempotency_enabled", "approval_gate_enabled"} <= switches
+        assert {"gating_enabled", "idempotency_enabled"} <= switches
+
+    def test_the_approval_gate_is_out_of_the_matrix_and_off_everywhere(self):
+        """Under a fixed auto_approve it cannot change a trajectory; its row would be flat."""
+        assert "approval_gate_enabled" not in HarnessConfig.ablation_switches()
+        assert HarnessConfig.full().approval_gate_enabled is False
+        assert HarnessConfig.full().approval.policy is ApprovalPolicy.AUTO_APPROVE
 
     def test_validation_mechanisms_are_separately_ablatable(self):
         # W1 showed these are distinct failure modes with distinct evidence
@@ -76,6 +82,25 @@ class TestAblationSwitches:
             "precondition_check_enabled",
             "parallel_call_block_enabled",
         } <= switches
+
+
+class TestOneAtATime:
+    def test_only_enables_exactly_the_named_switch(self):
+        for switch in HarnessConfig.full().enabled_ablation_switches():
+            arm = HarnessConfig.only(switch)
+            assert arm.enabled_ablation_switches() == (switch,)
+            assert arm.name == f"only_{switch}"
+
+    def test_only_refuses_what_is_not_ablatable(self):
+        with pytest.raises(ValueError, match="not an ablatable switch"):
+            HarnessConfig.only("approval_gate_enabled")
+        with pytest.raises(ValueError, match="not an ablatable switch"):
+            HarnessConfig.only("no_such_switch")
+
+    def test_only_accepts_non_behavioural_overrides(self):
+        arm = HarnessConfig.only("gating_enabled", audit_enabled=True)
+        assert arm.audit_enabled is True
+        assert arm.enabled_ablation_switches() == ("gating_enabled",)
 
 
 class TestLeaveOneOut:

@@ -288,6 +288,20 @@ class TestTransitionGraph:
     def test_cannot_jump_from_unverified_to_scoped(self):
         assert not is_legal_transition(SessionState.UNVERIFIED, SessionState.SCOPED)
 
+    def test_an_approval_can_open_outside_scope_and_return_there(self):
+        """Scoping writes is gating's rule; the gate must not crash when gating is off."""
+        for start in (SessionState.UNVERIFIED, SessionState.VERIFIED, SessionState.SCOPED):
+            assert is_legal_transition(start, SessionState.PENDING_APPROVAL)
+            assert is_legal_transition(SessionState.PENDING_APPROVAL, start)
+
+    def test_an_approval_opened_while_verified_resolves_back_to_verified(self):
+        tracker = SessionTracker(profile=RETAIL_PROFILE)
+        tracker.record_identity("u1")
+        assert tracker.state is SessionState.VERIFIED
+        assert tracker.open_approval("r1", W1) is SessionState.PENDING_APPROVAL
+        assert tracker.resolve_approval(True) is SessionState.VERIFIED
+        tracker.record_execution(W1)
+
     def test_every_state_has_an_entry(self):
         assert set(ALLOWED_TRANSITIONS) == set(SessionState)
 

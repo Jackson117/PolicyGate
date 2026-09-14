@@ -179,13 +179,22 @@ def derive_state(facts: SessionFacts, profile: DomainStateProfile) -> SessionSta
 
 
 ALLOWED_TRANSITIONS: Mapping[SessionState, frozenset[SessionState]] = {
-    SessionState.UNVERIFIED: frozenset({SessionState.VERIFIED, SessionState.TRANSFERRED}),
-    SessionState.VERIFIED: frozenset({SessionState.SCOPED, SessionState.TRANSFERRED}),
+    SessionState.UNVERIFIED: frozenset(
+        {SessionState.VERIFIED, SessionState.PENDING_APPROVAL, SessionState.TRANSFERRED}
+    ),
+    SessionState.VERIFIED: frozenset(
+        {SessionState.SCOPED, SessionState.PENDING_APPROVAL, SessionState.TRANSFERRED}
+    ),
     SessionState.SCOPED: frozenset(
         {SessionState.VERIFIED, SessionState.PENDING_APPROVAL, SessionState.TRANSFERRED}
     ),
     SessionState.PENDING_APPROVAL: frozenset(
-        {SessionState.SCOPED, SessionState.VERIFIED, SessionState.TRANSFERRED}
+        {
+            SessionState.UNVERIFIED,
+            SessionState.VERIFIED,
+            SessionState.SCOPED,
+            SessionState.TRANSFERRED,
+        }
     ),
     SessionState.TRANSFERRED: frozenset(),
 }
@@ -197,6 +206,13 @@ exists) and anything out of TRANSFERRED (the agent's turn has ended).
 SCOPED -> VERIFIED is present because scope legitimately widens again when a
 second candidate order comes into play; dropping out of write range is the
 intended behaviour, not an error.
+
+An approval may open from any live state, and returns to wherever it opened.
+"Writes only once exactly one target is in scope" is a rule, and rules belong
+to gating, which enforces it before a write can reach the gate. Encoding it here
+as well made the approval gate crash whenever gating was switched off -- an
+exception tau2 would retry three times and then file as an infrastructure error,
+silently dropping the task from that arm.
 """
 
 
