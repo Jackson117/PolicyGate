@@ -1,0 +1,532 @@
+{
+  "source": "experiments/2026-09-02_w1_baseline/results.json",
+  "n_tasks": 114,
+  "arms": 9,
+  "cost_per_sim": 0.0137,
+  "replicates": 1000,
+  "target_power": 0.8,
+  "metrics": {
+    "reward": {
+      "fit": {
+        "alpha": 1.42224728142901,
+        "beta": 1.3012049596052644,
+        "n_tasks": 30,
+        "trials": 3,
+        "intraclass_correlation": 0.26856796737702404,
+        "observed_counts": [
+          2,
+          3,
+          3,
+          1,
+          2,
+          2,
+          2,
+          1,
+          1,
+          3,
+          2,
+          1,
+          0,
+          0,
+          2,
+          1,
+          2,
+          3,
+          3,
+          2,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          3,
+          3,
+          2,
+          1
+        ]
+      },
+      "stability_check": {
+        "observed_always": 7,
+        "observed_never": 6,
+        "observed_unstable": 17,
+        "expected_always": 7.384160898609429,
+        "expected_never": 6.191126457712396,
+        "expected_unstable": 16.424712643678177
+      },
+      "rows": [
+        {
+          "trials": 1,
+          "k": 1,
+          "cost": 14.0562,
+          "headline": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 1,
+              "k": 1,
+              "alpha": 0.05,
+              "comparisons": 1
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 0.9453125,
+            "expected_difference": 0.1648214251416305,
+            "power": 0.8,
+            "replicates": 1000
+          },
+          "attribution": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 1,
+              "k": 1,
+              "alpha": 0.05,
+              "comparisons": 7
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 1.234375,
+            "expected_difference": 0.20947653189320964,
+            "power": 0.804,
+            "replicates": 1000
+          }
+        },
+        {
+          "trials": 2,
+          "k": 1,
+          "cost": 28.1124,
+          "headline": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 2,
+              "k": 1,
+              "alpha": 0.05,
+              "comparisons": 1
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 0.6484375,
+            "expected_difference": 0.11554810132483727,
+            "power": 0.8,
+            "replicates": 1000
+          },
+          "attribution": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 2,
+              "k": 1,
+              "alpha": 0.05,
+              "comparisons": 7
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 0.828125,
+            "expected_difference": 0.14574535629257768,
+            "power": 0.8,
+            "replicates": 1000
+          }
+        },
+        {
+          "trials": 3,
+          "k": 1,
+          "cost": 42.1686,
+          "headline": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 3,
+              "k": 1,
+              "alpha": 0.05,
+              "comparisons": 1
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 0.51953125,
+            "expected_difference": 0.09326926710561212,
+            "power": 0.802,
+            "replicates": 1000
+          },
+          "attribution": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 3,
+              "k": 1,
+              "alpha": 0.05,
+              "comparisons": 7
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 0.6640625,
+            "expected_difference": 0.11821571381440646,
+            "power": 0.8,
+            "replicates": 1000
+          }
+        },
+        {
+          "trials": 3,
+          "k": 3,
+          "cost": 42.1686,
+          "headline": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 3,
+              "k": 3,
+              "alpha": 0.05,
+              "comparisons": 1
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 0.796875,
+            "expected_difference": 0.14996731479795578,
+            "power": 0.802,
+            "replicates": 1000
+          },
+          "attribution": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 3,
+              "k": 3,
+              "alpha": 0.05,
+              "comparisons": 7
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 0.984375,
+            "expected_difference": 0.18850177713389327,
+            "power": 0.805,
+            "replicates": 1000
+          }
+        },
+        {
+          "trials": 5,
+          "k": 1,
+          "cost": 70.281,
+          "headline": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 5,
+              "k": 1,
+              "alpha": 0.05,
+              "comparisons": 1
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 0.40234375,
+            "expected_difference": 0.07264193916731584,
+            "power": 0.805,
+            "replicates": 1000
+          },
+          "attribution": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 5,
+              "k": 1,
+              "alpha": 0.05,
+              "comparisons": 7
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 0.515625,
+            "expected_difference": 0.09258706231316777,
+            "power": 0.805,
+            "replicates": 1000
+          }
+        },
+        {
+          "trials": 5,
+          "k": 3,
+          "cost": 70.281,
+          "headline": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 5,
+              "k": 3,
+              "alpha": 0.05,
+              "comparisons": 1
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 0.53125,
+            "expected_difference": 0.09690635371810606,
+            "power": 0.803,
+            "replicates": 1000
+          },
+          "attribution": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 5,
+              "k": 3,
+              "alpha": 0.05,
+              "comparisons": 7
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 0.671875,
+            "expected_difference": 0.12471880171449473,
+            "power": 0.805,
+            "replicates": 1000
+          }
+        }
+      ]
+    },
+    "DB": {
+      "fit": {
+        "alpha": 2.1074721548995465,
+        "beta": 1.1073158779980667,
+        "n_tasks": 30,
+        "trials": 3,
+        "intraclass_correlation": 0.23725985558341656,
+        "observed_counts": [
+          2,
+          3,
+          3,
+          1,
+          2,
+          2,
+          2,
+          1,
+          2,
+          3,
+          2,
+          3,
+          3,
+          0,
+          2,
+          1,
+          2,
+          3,
+          3,
+          2,
+          0,
+          1,
+          0,
+          3,
+          3,
+          1,
+          3,
+          3,
+          2,
+          1
+        ]
+      },
+      "stability_check": {
+        "observed_always": 11,
+        "observed_never": 3,
+        "observed_unstable": 16,
+        "expected_always": 11.420897455133916,
+        "expected_never": 3.0785278322224157,
+        "expected_unstable": 15.500574712643667
+      },
+      "rows": [
+        {
+          "trials": 1,
+          "k": 1,
+          "cost": 14.0562,
+          "headline": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 1,
+              "k": 1,
+              "alpha": 0.05,
+              "comparisons": 1
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 1.03515625,
+            "expected_difference": 0.15520880706579293,
+            "power": 0.802,
+            "replicates": 1000
+          },
+          "attribution": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 1,
+              "k": 1,
+              "alpha": 0.05,
+              "comparisons": 7
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 1.34765625,
+            "expected_difference": 0.1912685492299208,
+            "power": 0.801,
+            "replicates": 1000
+          }
+        },
+        {
+          "trials": 2,
+          "k": 1,
+          "cost": 28.1124,
+          "headline": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 2,
+              "k": 1,
+              "alpha": 0.05,
+              "comparisons": 1
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 0.6875,
+            "expected_difference": 0.1088791398395074,
+            "power": 0.805,
+            "replicates": 1000
+          },
+          "attribution": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 2,
+              "k": 1,
+              "alpha": 0.05,
+              "comparisons": 7
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 0.890625,
+            "expected_difference": 0.13673120765727723,
+            "power": 0.8,
+            "replicates": 1000
+          }
+        },
+        {
+          "trials": 3,
+          "k": 1,
+          "cost": 42.1686,
+          "headline": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 3,
+              "k": 1,
+              "alpha": 0.05,
+              "comparisons": 1
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 0.55859375,
+            "expected_difference": 0.0901016713899693,
+            "power": 0.807,
+            "replicates": 1000
+          },
+          "attribution": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 3,
+              "k": 1,
+              "alpha": 0.05,
+              "comparisons": 7
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 0.72265625,
+            "expected_difference": 0.11385404442757002,
+            "power": 0.803,
+            "replicates": 1000
+          }
+        },
+        {
+          "trials": 3,
+          "k": 3,
+          "cost": 42.1686,
+          "headline": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 3,
+              "k": 3,
+              "alpha": 0.05,
+              "comparisons": 1
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 0.75,
+            "expected_difference": 0.15776295752181424,
+            "power": 0.8,
+            "replicates": 1000
+          },
+          "attribution": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 3,
+              "k": 3,
+              "alpha": 0.05,
+              "comparisons": 7
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 0.953125,
+            "expected_difference": 0.20016881228774866,
+            "power": 0.8,
+            "replicates": 1000
+          }
+        },
+        {
+          "trials": 5,
+          "k": 1,
+          "cost": 70.281,
+          "headline": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 5,
+              "k": 1,
+              "alpha": 0.05,
+              "comparisons": 1
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 0.41796875,
+            "expected_difference": 0.06869135000250956,
+            "power": 0.802,
+            "replicates": 1000
+          },
+          "attribution": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 5,
+              "k": 1,
+              "alpha": 0.05,
+              "comparisons": 7
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 0.5390625,
+            "expected_difference": 0.0871846281751462,
+            "power": 0.802,
+            "replicates": 1000
+          }
+        },
+        {
+          "trials": 5,
+          "k": 3,
+          "cost": 70.281,
+          "headline": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 5,
+              "k": 3,
+              "alpha": 0.05,
+              "comparisons": 1
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 0.5,
+            "expected_difference": 0.1047451237165222,
+            "power": 0.802,
+            "replicates": 1000
+          },
+          "attribution": {
+            "design": {
+              "n_tasks": 114,
+              "n_trials": 5,
+              "k": 3,
+              "alpha": 0.05,
+              "comparisons": 7
+            },
+            "target_power": 0.8,
+            "achievable": true,
+            "logit_shift": 0.65625,
+            "expected_difference": 0.1379399888385815,
+            "power": 0.801,
+            "replicates": 1000
+          }
+        }
+      ]
+    }
+  }
+}
