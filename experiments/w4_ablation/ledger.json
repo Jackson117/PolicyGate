@@ -1,0 +1,48 @@
+{
+  "plan_fingerprint": "250a827dddd2bba3c08a41deaff2fbf68d5f2baa216167f08506d68597d5cb99",
+  "complete": {
+    "baseline/chunk_000": {
+      "key": "baseline/chunk_000",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.046354,
+      "user_cost": 0.2750012
+    },
+    "full/chunk_000": {
+      "key": "full/chunk_000",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.4184036,
+      "user_cost": 0.3132828
+    },
+    "baseline/chunk_001": {
+      "key": "baseline/chunk_001",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.0171352,
+      "user_cost": 0.2804288
+    },
+    "full/chunk_001": {
+      "key": "full/chunk_001",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.2127968,
+      "user_cost": 0.2946696
+    },
+    "baseline/chunk_002": {
+      "key": "baseline/chunk_002",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.9462619999999999,
+      "user_cost": 0.26208159999999997
+    },
+    "full/chunk_002": {
+      "key": "full/chunk_002",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.1423032,
+      "user_cost": 0.2899464
+    }
+  },
+  "incomplete": {}
+}
