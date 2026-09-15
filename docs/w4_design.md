@@ -18,11 +18,11 @@ only_<switch>  × 7             baseline + 单个机制
 ```
 
 7 个开关：`gating`、`context_pruning`、`schema_check`、`value_canonicalization`、
-`referent_uniqueness`、`precondition_check`、`parallel_call_block`。
+`referent_check`、`precondition_check`、`parallel_call_block`。
 由 `HarnessConfig.ablation_switches()` 自动推出，用 `HarnessConfig.only()` 构造，不手写。
 
-**为什么不用留一法**：几个机制互相兜底——gating 的 scope 规则和 validation 的
-referent 检查都能挡住「写错订单」。留一法里去掉任何一个，另一个补上，两行都接近 0，
+**为什么不用留一法**：几个机制互相兜底——gating 的状态规则和 validation 的
+referent 检查都作用在写操作的对象上。留一法里去掉任何一个，另一个补上，两行都接近 0，
 读起来就是「两个都没用」。单开设计回答的是「这个机制单独有没有用」，不受遮蔽。
 
 **代价，报告里必须写**：各单开效应**加起来不等于** full − baseline，差额是交互效应。
@@ -88,3 +88,53 @@ DB 分量观测 11/3/16，期望 11.4/3.1/15.5。
 
 **读法**：一个单开机制若只改变 1–3 个任务，效应约 1–3pp，**任何在预算内的设计都测不出显著性**。
 归因臂的价值在于描述性证据——哪些任务翻转、哪条规则触发——而不是 p 值。
+
+---
+
+## 偏差记录
+
+### 偏差 1（2026-09-15）：v1 在 3/6 块后停止，referent 规则改为所有权检查
+
+**发生了什么。** v1（`experiments/w4_ablation/`，plan `250a827dddd2`，commit `399ae55`）
+headline 阶段跑完 3 块、60 任务 × 5 轮后停止，花费 $8.50。
+
+**触发停止的是中期结果，改动的依据不是。** 60 任务时 full 的 reward pass^1 为 0.357，baseline 为 0.487，
+配对差 −0.13，95% CI [−0.21, −0.06]。这个结果只说明需要查原因，
+改代码的依据是下面这些**与结果方向无关的正确性证据**：
+
+- full 的 291 次 `validation.refused` 几乎都是同一条理由：「会话锁定在订单 X，却在写订单 Y」。
+  锁定对象来自 `retail_facts`：**最近一次 `get_order_details` 返回的订单**。
+  多订单任务中，模型逐个查看订单后，锁定落在最后查的那个上。
+- 这条规则拒绝的 127 个不同的（工具, 订单）组合里，**107 个是任务参考轨迹里的动作**。
+  以相同参数计的 130 个被拒写调用中，117 个直到对话结束也没有执行。
+- 触发过该规则的 113 条 simulation，full 通过率 0.08，同任务上 baseline 为 0.37；
+  没触发过的 187 条，分别为 0.524 和 0.557。这是相关性证据
+  （多订单任务本来就难），同任务 baseline 只控制了任务难度这一项。
+- 规则本身与 policy.md 矛盾：政策允许「同一用户的多个请求」，禁止的是「任何其他用户」的请求。
+
+**改了什么。**
+- `referent_uniqueness_enabled` 更名为 `referent_check_enabled`。「订单必须被某次查询返回过」保留，
+  「必须是最后查的那个」换成「必须属于已认证用户」（`FailureCode.REFERENT_NOT_OWNED`）。
+  retail 全部 165 个针对订单的参考写动作中，作用于他人订单的数为 0。
+  用新规则离线重审 v1 中被锁定规则拒绝的 130 个写调用：130 个全部放行。
+- 状态未取回时 precondition 仍然拒绝（政策要求先查状态再动作），
+  但提示从 `has status=None` 改为「状态尚未取回，先查询」。
+- runner 在续跑时比对「决定结果的代码」（harness / adapters / eval 的已提交树、`uv.lock`、
+  tau2 checkout 的 commit），代码不同则拒绝续跑；代码未提交则拒绝启动。
+  v1 的 plan 指纹不含代码版本，修完再续跑会把两个版本的块悄悄混在一起。
+
+**离线审计过、决定不改的规则**（依据 v1 的 300 条 full simulation）：
+- `gating.one_call_per_turn`：拒绝 1041 个不同调用，其中 499 个是参考动作，但被拒的是「同一 turn 内的多个调用」，
+  政策明文禁止，模型需要逐个重新提议。它的轮次代价是机制本身的代价，照实报告。
+- precondition：命中参考动作的真实个例中，task 37 是订单已被取消（拒绝正确）；
+  task 104 的参考轨迹是先改地址、再改 items，符合政策；模型在 full 臂里颠倒了顺序，
+  先改 items 再改地址。policy.md 说改 items 之后「不能再修改或取消」，harness 拒绝正确；
+  但 tau2 的实现（`"pending" in order.status`）会接受这一步，DB 终态照样能对上。
+  即 harness 执行政策、评分器不执行，此类失分报告里单列，不为贴合评分而改。
+- `gating` 在写之前要求会话处于 SCOPED 状态：`modify_user_address` 的参考动作执行率
+  baseline 17/35，full 15/35，未见明显遮蔽，不改。
+
+**预先承诺。** v2 从新目录、全部 114 任务从头跑，不复用 v1 的任何块（包括 baseline）。
+**v2 开跑后，不论结果方向如何，不再修改 harness、adapters、eval**；若再发现正确性问题，
+记为偏差 2 并报告其影响，不重跑。v1 的数据保留，作为「审计链定位出误伤机制」的证据。
+
