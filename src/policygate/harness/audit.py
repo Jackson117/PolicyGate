@@ -163,6 +163,30 @@ class AuditChain:
         self._config = config
         self._records: list[AuditRecord] = []
 
+    @classmethod
+    def resume(
+        cls,
+        session_id: str,
+        clock: Callable[[], datetime],
+        config: HarnessConfig,
+        records: Sequence[AuditRecord],
+    ) -> AuditChain:
+        """Continue a chain persisted elsewhere -- a checkpoint, a database row set.
+
+        Refuses anything that does not verify, or that belongs to another session:
+        appending to a broken chain would give later records a valid-looking link
+        to evidence that has already been altered.
+        """
+        verification = verify_records(records)
+        if not verification.intact:
+            raise ValueError(f"refusing to resume a broken chain: {verification.first_break}")
+        foreign = {r.session_id for r in records} - {session_id}
+        if foreign:
+            raise ValueError(f"records belong to other sessions: {sorted(foreign)}")
+        chain = cls(session_id, clock, config)
+        chain._records = list(records)
+        return chain
+
     @property
     def session_id(self) -> str:
         return self._session_id

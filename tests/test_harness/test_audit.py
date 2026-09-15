@@ -9,6 +9,8 @@ No LLM, no benchmark, no network.
 
 from datetime import datetime, timedelta
 
+import pytest
+
 from policygate.harness.audit import (
     AuditChain,
     BreakKind,
@@ -232,3 +234,35 @@ class TestTheSwitch:
     def test_the_baseline_arm_carries_no_audit(self):
         c = AuditChain("s", lambda: START, HarnessConfig.baseline())
         assert c.enabled is False
+
+
+class TestResume:
+    """A chain persisted between requests must continue, and must not launder tampering."""
+
+    def build(self, n=3):
+        chain = AuditChain("s1", ticking_clock(), HarnessConfig.full())
+        for _ in range(n):
+            chain.append(AuditEvent.TOOL_PROPOSED, tool_call=CANCEL, decision=ALLOW)
+        return chain
+
+    def test_a_resumed_chain_continues_the_sequence_and_the_links(self):
+        original = self.build()
+        resumed = AuditChain.resume("s1", ticking_clock(), HarnessConfig.full(), original.records)
+        record = resumed.append(AuditEvent.TOOL_PROPOSED, tool_call=RETURN, decision=ALLOW)
+        assert record.seq == 3
+        assert record.prev_hash == original.head_hash
+        assert resumed.verify().intact
+
+    def test_a_tampered_chain_is_refused(self):
+        records = list(self.build().records)
+        records[1] = records[1].model_copy(update={"event": AuditEvent.TOOL_EXECUTED})
+        with pytest.raises(ValueError, match="broken chain"):
+            AuditChain.resume("s1", ticking_clock(), HarnessConfig.full(), records)
+
+    def test_another_session_s_records_are_refused(self):
+        with pytest.raises(ValueError, match="other sessions"):
+            AuditChain.resume("s2", ticking_clock(), HarnessConfig.full(), self.build().records)
+
+    def test_an_empty_chain_resumes_at_genesis(self):
+        chain = AuditChain.resume("s1", ticking_clock(), HarnessConfig.full(), ())
+        assert chain.head_hash == GENESIS_HASH
