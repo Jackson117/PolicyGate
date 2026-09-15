@@ -332,7 +332,11 @@ def _provenance() -> dict[str, Any]:
     trees = [_git("rev-parse", f"HEAD:{path}", cwd=root) for path in RESULT_PATHS]
     tau2 = _git("rev-parse", "HEAD", cwd=checkout)
     local = _git("status", "--porcelain", "--untracked-files=no", "--", *RESULT_PATHS, cwd=root)
-    vendored = _git("status", "--porcelain", "--untracked-files=no", cwd=checkout)
+    # tau2's own uv.lock is rewritten by `uv sync` (a version-string bump on this
+    # checkout) and resolves nothing here: the environment comes from the root
+    # uv.lock, which is in RESULT_PATHS.
+    vendored = _git("status", "--porcelain", "--untracked-files=no", "--", ".",
+                    ":(exclude)uv.lock", cwd=checkout)
     code = None
     if all(trees) and tau2 and local is not None and vendored is not None:
         code = sha256_hex("\n".join([*trees, tau2]))
