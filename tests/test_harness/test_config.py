@@ -78,7 +78,7 @@ class TestAblationSwitches:
         switches = set(HarnessConfig.ablation_switches())
         assert {
             "value_canonicalization_enabled",
-            "referent_uniqueness_enabled",
+            "referent_check_enabled",
             "precondition_check_enabled",
             "parallel_call_block_enabled",
         } <= switches

@@ -95,10 +95,6 @@ class _Step:
             "audit": self.new_audit(),
         }
 
-    def scoped_target(self) -> str | None:
-        targets = self.tracker.facts.candidate_targets
-        return next(iter(targets)) if len(targets) == 1 else None
-
 
 def _refusal(call_id: str, decision: Decision) -> dict[str, Any]:
     return dump(ToolMessage(
@@ -145,7 +141,7 @@ def build_graph(runtime: RetailRuntime, checkpointer: Any):
         for original, call, decision in reviewed:
             if decision.allowed:
                 checks = runtime.validator.review(
-                    call, scoped_target=step.scoped_target(), world=step.world
+                    call, subject=step.tracker.facts.user_id, world=step.world
                 )
                 if not checks.passed:
                     decision = Decision(outcome=DecisionOutcome.DENY, rule="validation.refused",

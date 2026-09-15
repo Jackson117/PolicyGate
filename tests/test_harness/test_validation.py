@@ -64,9 +64,13 @@ CONSTRAINTS = DomainConstraints(
     ),
 )
 
-DELIVERED = KnownObject(id="#W5490111", attributes={"status": "delivered"})
-PENDING = KnownObject(id="#W7387996", attributes={"status": "pending"})
-WORLD = world_from([DELIVERED, PENDING])
+USER = "mia_garcia_4516"
+DELIVERED = KnownObject(id="#W5490111", attributes={"status": "delivered"}, owner_id=USER)
+PENDING = KnownObject(id="#W7387996", attributes={"status": "pending"}, owner_id=USER)
+# Listed by a user profile, never fetched: known to exist, status unknown.
+LISTED = KnownObject(id="#W9000001", owner_id=USER)
+FOREIGN = KnownObject(id="#W8000002", attributes={"status": "delivered"}, owner_id="noah_ito_3850")
+WORLD = world_from([DELIVERED, PENDING, LISTED, FOREIGN])
 
 
 def validator(**overrides) -> Validator:
@@ -133,26 +137,61 @@ class TestReferentIdentity:
         result = validator().review(
             call("return_delivered_order_items", order_id="#12345",
                  item_ids=["x"], payment_method_id="p"),
-            scoped_target="#W5490111",
+            subject=USER,
             world=WORLD,
         )
         assert FailureCode.REFERENT_UNKNOWN in codes(result)
 
-    def test_a_known_id_that_is_not_the_scoped_one_is_refused(self):
-        # task 14: items returned from a different order than the one discussed.
+    def test_another_users_order_is_refused(self):
+        # policy.md: "must deny any requests for tasks related to any other user".
         result = validator().review(
-            call("return_delivered_order_items", order_id="#W7387996",
+            call("return_delivered_order_items", order_id=FOREIGN.id,
                  item_ids=["x"], payment_method_id="p"),
-            scoped_target="#W5490111",
+            subject=USER,
             world=WORLD,
         )
-        assert FailureCode.REFERENT_MISMATCH in codes(result)
+        assert codes(result) == {FailureCode.REFERENT_NOT_OWNED}
 
-    def test_the_scoped_object_passes(self):
+    def test_any_of_the_users_own_orders_passes_whichever_was_looked_up_last(self):
+        """W4 v1 regression: the check compared the referent with the last order
+        fetched, and refused 107 reference actions of multi-order tasks.
+
+        Here the session has looked at both of the user's orders, the pending one
+        last, and returns items from the delivered one -- task 58's shape.
+        """
+        result = validator().review(
+            call("return_delivered_order_items", order_id=DELIVERED.id,
+                 item_ids=["x"], payment_method_id="p"),
+            subject=USER,
+            world=world_from([DELIVERED, PENDING]),
+        )
+        assert result.passed
+
+    def test_ownership_is_not_judged_before_anyone_is_authenticated(self):
+        # Identity-first is gating's rule; reporting it again here as "not owned
+        # by None" would be a second, misleading account of the same problem.
+        result = validator().review(
+            call("return_delivered_order_items", order_id=FOREIGN.id,
+                 item_ids=["x"], payment_method_id="p"),
+            world=WORLD,
+        )
+        assert result.passed
+
+    def test_ownership_is_not_judged_when_the_result_did_not_say(self):
+        unowned = KnownObject(id="#W7000003", attributes={"status": "delivered"})
+        result = validator().review(
+            call("return_delivered_order_items", order_id=unowned.id,
+                 item_ids=["x"], payment_method_id="p"),
+            subject=USER,
+            world=world_from([unowned]),
+        )
+        assert result.passed
+
+    def test_the_users_own_order_passes(self):
         result = validator().review(
             call("return_delivered_order_items", order_id="#W5490111",
                  item_ids=["x"], payment_method_id="p"),
-            scoped_target="#W5490111",
+            subject=USER,
             world=WORLD,
         )
         assert result.passed
@@ -161,7 +200,7 @@ class TestReferentIdentity:
         # cancel_pending_order has no registered schema, so this failure can only
         # come from the referent check.
         result = validator().review(
-            call("cancel_pending_order"), scoped_target="#W7387996", world=WORLD
+            call("cancel_pending_order"), subject=USER, world=WORLD
         )
         assert FailureCode.SCHEMA_INVALID in codes(result)
 
@@ -170,7 +209,7 @@ class TestReferentIdentity:
         # failure on the same field reads as two separate things to fix.
         result = validator().review(
             call("return_delivered_order_items", item_ids=["x"], payment_method_id="p"),
-            scoped_target="#W5490111",
+            subject=USER,
             world=WORLD,
         )
         assert [f.field for f in result.failures].count("order_id") == 1
@@ -178,7 +217,7 @@ class TestReferentIdentity:
     def test_the_referent_check_still_reports_it_when_no_schema_covers_it(self):
         result = validator(schema_check_enabled=False).review(
             call("return_delivered_order_items", item_ids=["x"]),
-            scoped_target="#W5490111",
+            subject=USER,
             world=WORLD,
         )
         assert any(f.field == "order_id" for f in result.failures)
@@ -201,7 +240,7 @@ class TestPreconditions:
         result = validator().review(
             call("return_delivered_order_items", order_id="#W7387996",
                  item_ids=["x"], payment_method_id="p"),
-            scoped_target="#W7387996",
+            subject=USER,
             world=WORLD,
         )
         assert FailureCode.PRECONDITION_UNMET in codes(result)
@@ -210,7 +249,7 @@ class TestPreconditions:
         result = validator().review(
             call("return_delivered_order_items", order_id="#W5490111",
                  item_ids=["x"], payment_method_id="p"),
-            scoped_target="#W5490111",
+            subject=USER,
             world=WORLD,
         )
         assert result.passed
@@ -218,7 +257,7 @@ class TestPreconditions:
     def test_cancelling_a_delivered_order_is_refused(self):
         result = validator().review(
             call("cancel_pending_order", order_id="#W5490111"),
-            scoped_target="#W5490111",
+            subject=USER,
             world=WORLD,
         )
         assert FailureCode.PRECONDITION_UNMET in codes(result)
@@ -226,12 +265,24 @@ class TestPreconditions:
     def test_the_refusal_states_both_the_observed_and_the_required_status(self):
         result = validator().review(
             call("cancel_pending_order", order_id="#W5490111"),
-            scoped_target="#W5490111",
+            subject=USER,
             world=WORLD,
         )
         failure = next(f for f in result.failures if f.code is FailureCode.PRECONDITION_UNMET)
         assert failure.observed == "delivered"
         assert failure.expected == ["pending"]
+
+    def test_an_unretrieved_status_is_refused_with_a_message_the_model_can_act_on(self):
+        # W4 v1 told the model "has status=None"; it should say to look it up.
+        result = validator().review(
+            call("return_delivered_order_items", order_id=LISTED.id,
+                 item_ids=["x"], payment_method_id="p"),
+            subject=USER,
+            world=WORLD,
+        )
+        failure = next(f for f in result.failures if f.code is FailureCode.PRECONDITION_UNMET)
+        assert "has not been retrieved" in failure.message
+        assert "None" not in failure.message
 
     def test_preconditions_are_skipped_for_an_object_that_is_not_known(self):
         # "status must be delivered" about a nonexistent order would be noise on
@@ -248,7 +299,7 @@ class TestArgumentSchema:
     def test_a_missing_required_argument_is_reported(self):
         result = validator().review(
             call("return_delivered_order_items", order_id="#W5490111"),
-            scoped_target="#W5490111",
+            subject=USER,
             world=WORLD,
         )
         assert FailureCode.SCHEMA_INVALID in codes(result)
@@ -261,7 +312,7 @@ class TestArgumentSchema:
         result = validator().review(
             call("return_delivered_order_items", order_id="#W5490111", item_ids=["x"],
                  payment_method_id="p", refund_to="paypal"),
-            scoped_target="#W5490111",
+            subject=USER,
             world=WORLD,
         )
         assert any(f.field == "refund_to" for f in result.failures)
@@ -278,19 +329,19 @@ class TestSwitchesAreIndependent:
         "switch,expected",
         [
             ("value_canonicalization_enabled", FailureCode.VALUE_NOT_CANONICAL),
-            # These args name a known order that is not the scoped one, so the
-            # referent failure here is a MISMATCH rather than UNKNOWN.
-            ("referent_uniqueness_enabled", FailureCode.REFERENT_MISMATCH),
+            # The order is known but owned by USER, and the session acts for
+            # someone else, so the referent failure is NOT_OWNED, not UNKNOWN.
+            ("referent_check_enabled", FailureCode.REFERENT_NOT_OWNED),
             ("precondition_check_enabled", FailureCode.PRECONDITION_UNMET),
         ],
     )
     def test_disabling_one_silences_only_its_own_code(self, switch, expected):
         args = dict(order_id="#W7387996", item_ids=["x"], payment_method_id="p", country="Nowhere")
         on = validator().review(
-            call("return_delivered_order_items", **args), scoped_target="#W5490111", world=WORLD
+            call("return_delivered_order_items", **args), subject="noah_ito_3850", world=WORLD
         )
         off = validator(**{switch: False}).review(
-            call("return_delivered_order_items", **args), scoped_target="#W5490111", world=WORLD
+            call("return_delivered_order_items", **args), subject="noah_ito_3850", world=WORLD
         )
         assert expected in codes(on)
         assert expected not in codes(off)
@@ -300,12 +351,12 @@ class TestSwitchesAreIndependent:
         v = validator(
             schema_check_enabled=False,
             value_canonicalization_enabled=False,
-            referent_uniqueness_enabled=False,
+            referent_check_enabled=False,
             precondition_check_enabled=False,
         )
         result = v.review(
             call("return_delivered_order_items", order_id="#12345", country="Freedonia"),
-            scoped_target="#W5490111",
+            subject=USER,
             world=WORLD,
         )
         assert result.passed

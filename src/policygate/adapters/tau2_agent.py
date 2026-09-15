@@ -294,7 +294,7 @@ class HarnessAgent(HalfDuplexAgent[HarnessAgentState]):
             if decision.outcome is DecisionOutcome.ALLOW:
                 checks = self.validator.review(
                     call,
-                    scoped_target=self._scoped_target(state),
+                    subject=state.tracker.facts.user_id,
                     world=state.world,
                 )
                 if not checks.passed:
@@ -314,10 +314,6 @@ class HarnessAgent(HalfDuplexAgent[HarnessAgentState]):
             )
             verdicts.append((original, decision, checks))
         return verdicts
-
-    def _scoped_target(self, state: HarnessAgentState) -> str | None:
-        targets = state.tracker.facts.candidate_targets
-        return next(iter(targets)) if len(targets) == 1 else None
 
     def _needs_approval(self, call: ToolCall, state: HarnessAgentState) -> bool:
         if not self.config.approval_gate_enabled:

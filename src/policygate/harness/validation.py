@@ -185,12 +185,12 @@ class Validator:
         self,
         call: ToolCall,
         *,
-        scoped_target: str | None = None,
+        subject: str | None = None,
         world: Mapping[str, KnownObject] | None = None,
     ) -> CheckResult:
         """Check ``call`` against the constraints that are switched on.
 
-        ``scoped_target`` is the single object the session has narrowed to, and
+        ``subject`` is the authenticated user the session acts for, and
         ``world`` is everything reads have returned so far.
         """
         world = world or {}
@@ -204,8 +204,8 @@ class Validator:
         referent = self._referent_of(call)
         referent_known = referent is not None and referent in world
 
-        if self._config.referent_uniqueness_enabled:
-            result = result.merged_with(self._check_referent(call, referent, scoped_target, world))
+        if self._config.referent_check_enabled:
+            result = result.merged_with(self._check_referent(call, referent, subject, world))
 
         # Preconditions describe the target's state, so they are only meaningful
         # once the target is known. Reporting "status must be delivered" about an
@@ -291,7 +291,7 @@ class Validator:
         self,
         call: ToolCall,
         referent: str | None,
-        scoped_target: str | None,
+        subject: str | None,
         world: Mapping[str, KnownObject],
     ) -> CheckResult:
         field = self._c.referent_fields.get(call.name)
@@ -327,17 +327,24 @@ class Validator:
                 )
             )
 
-        if scoped_target is not None and referent != scoped_target:
+        # Ownership, not "the object discussed last". policy.md allows "multiple
+        # requests from the same user" and forbids acting for "any other user";
+        # which of the user's own orders is meant lives in the conversation, where
+        # the harness cannot see it. W4 v1 compared the referent with the last
+        # order looked up and refused 127 distinct writes, 107 of them the task's
+        # reference actions (docs/w4_design.md, deviation 1).
+        owner = world[referent].owner_id
+        if subject is not None and owner is not None and owner != subject:
             return CheckResult.failed(
                 CheckFailure(
-                    code=FailureCode.REFERENT_MISMATCH,
+                    code=FailureCode.REFERENT_NOT_OWNED,
                     field=field,
                     message=(
-                        f"the session is scoped to {scoped_target!r} but this acts on "
-                        f"{referent!r}; confirm which object is meant before writing"
+                        f"{referent!r} belongs to {owner!r}, not to the authenticated user "
+                        f"{subject!r}; only the authenticated user's objects can be changed"
                     ),
-                    observed=referent,
-                    expected=scoped_target,
+                    observed=owner,
+                    expected=subject,
                 )
             )
         return CheckResult.ok()
@@ -347,6 +354,23 @@ class Validator:
         for pre in self._c.preconditions_for(call.name):
             observed = target.attributes.get(pre.attribute)
             if observed in pre.allowed_values:
+                continue
+            if observed is None:
+                # Listed (e.g. by a user profile) but never fetched. Refusing is
+                # still right -- policy.md says to check the status before acting --
+                # but "has status=None" told the model nothing it could act on.
+                failures.append(
+                    CheckFailure(
+                        code=FailureCode.PRECONDITION_UNMET,
+                        field=pre.attribute,
+                        message=(
+                            f"{pre.name}: the {pre.attribute} of {target.id!r} has not been "
+                            f"retrieved in this session; look it up before {call.name!r}"
+                        ),
+                        observed=None,
+                        expected=sorted(pre.allowed_values),
+                    )
+                )
                 continue
             failures.append(
                 CheckFailure(

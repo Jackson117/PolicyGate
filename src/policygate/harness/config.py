@@ -102,8 +102,13 @@ class HarnessConfig(BaseModel):
     value_canonicalization_enabled: bool = False
     """Reject non-canonical enum values. Evidence: task 22, "United States" vs "USA"."""
 
-    referent_uniqueness_enabled: bool = False
-    """Refuse a write while several candidate objects match. Evidence: task 14."""
+    referent_check_enabled: bool = False
+    """Refuse a write whose object no lookup returned, or that another user owns.
+
+    Evidence: 17 of W1's 31 "Order not found" used ids no result had contained.
+    Was ``referent_uniqueness_enabled``, which also refused writes to any order
+    but the one looked up last; see docs/w4_design.md, deviation 1.
+    """
 
     precondition_check_enabled: bool = False
     """Check business preconditions before proposing. Evidence: 31x "Order not found"."""
@@ -182,7 +187,7 @@ class HarnessConfig(BaseModel):
             "context_pruning_enabled": True,
             "schema_check_enabled": True,
             "value_canonicalization_enabled": True,
-            "referent_uniqueness_enabled": True,
+            "referent_check_enabled": True,
             "precondition_check_enabled": True,
             "parallel_call_block_enabled": True,
             "audit_enabled": True,

@@ -251,6 +251,59 @@ class TestValidationRefusals:
         assert denied[-1].decision.rule == "validation.refused"
         assert "#12345" in denied[-1].decision.reason
 
+    @staticmethod
+    def look_up(agent, llm, state, call_id: str, order_json: str) -> None:
+        llm.responses.append(
+            calls("get_order_details", call_id, order_id=json.loads(order_json)["order_id"])
+        )
+        agent.generate_next_message(UserMessage(role="user", content="and this one?"), state)
+        llm.responses.append(says("Found it."))
+        agent.generate_next_message(tool_result(call_id, order_json), state)
+
+    def test_a_write_to_an_order_looked_up_earlier_is_not_refused(
+        self, env, retail_db, monkeypatch
+    ):
+        """W4 v1 regression, end to end.
+
+        The adapter used to pass the order fetched last as the session's scope,
+        so looking at a second order made the first unwritable: 107 of the 127
+        distinct writes refused that way were the task's reference actions.
+        """
+        llm = ScriptedLLM()
+        agent = build(env, retail_db, llm, monkeypatch)
+        state = verified_scoped(agent, llm, ORDER_DELIVERED)
+        self.look_up(agent, llm, state, "o2", ORDER_PENDING)  # now the last one fetched
+
+        llm.responses.extend([
+            calls("return_delivered_order_items", "w1", order_id="#W5490111",
+                  item_ids=["x"], payment_method_id="p"),
+            says("fallback: the return was refused"),
+        ])
+        message, _ = agent.generate_next_message(
+            UserMessage(role="user", content="return the delivered one"), state
+        )
+        assert [c.name for c in message.tool_calls or []] == ["return_delivered_order_items"]
+        assert not [r for r in state.chain.records if r.event is AuditEvent.TOOL_DENIED]
+
+    def test_a_write_to_another_users_order_is_refused(self, env, retail_db, monkeypatch):
+        foreign = json.dumps({"order_id": "#W8000002", "status": "delivered", "user_id": "u2"})
+        llm = ScriptedLLM()
+        agent = build(env, retail_db, llm, monkeypatch)
+        state = verified_scoped(agent, llm, ORDER_DELIVERED)
+        self.look_up(agent, llm, state, "o2", foreign)
+
+        llm.responses.extend([
+            calls("return_delivered_order_items", "w1", order_id="#W8000002",
+                  item_ids=["x"], payment_method_id="p"),
+            says("That order is on another account."),
+        ])
+        message, _ = agent.generate_next_message(
+            UserMessage(role="user", content="return my friend's order"), state
+        )
+        assert message.content == "That order is on another account."
+        denied = [r for r in state.chain.records if r.event is AuditEvent.TOOL_DENIED]
+        assert "belongs to 'u2'" in denied[-1].decision.reason
+
     def test_a_precondition_failure_is_refused(self, env, retail_db, monkeypatch):
         llm = ScriptedLLM()
         agent = build(env, retail_db, llm, monkeypatch)
@@ -548,7 +601,7 @@ class TestEachSwitchWorksAlone:
                 self.denied_with("state='New York'"),
             ),
             # An order id no lookup ever returned.
-            "referent_uniqueness_enabled": (
+            "referent_check_enabled": (
                 [(hi, cancels("#12345", "c1"))],
                 self.denied_with("#12345"),
             ),
