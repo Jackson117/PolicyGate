@@ -1,0 +1,20 @@
+{
+  "plan_fingerprint": "737f7e15846ce27de8d1f95ebd367746d5481a031dbc1e5297243565f07ab1ac",
+  "complete": {
+    "baseline/chunk_000": {
+      "key": "baseline/chunk_000",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.2104024,
+      "user_cost": 0.28827559999999997
+    },
+    "full/chunk_000": {
+      "key": "full/chunk_000",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.6286116,
+      "user_cost": 0.29942799999999997
+    }
+  },
+  "incomplete": {}
+}
