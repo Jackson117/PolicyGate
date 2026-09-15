@@ -148,6 +148,30 @@ class KnownObject(BaseModel):
     attributes: Mapping[str, str] = {}
     owner_id: str | None = None
 
+    def observed_again(self, newer: KnownObject) -> KnownObject:
+        """Fold a later observation of the same object into this one.
+
+        What the newer result says wins -- a cancelled order really is cancelled
+        now. What it does not say is kept: a user profile lists order ids with no
+        status, and letting that listing replace an order fetched earlier erased
+        the status the precondition check needs. In W4 v2 that refused 12 writes
+        to orders whose status had been retrieved (docs/w4_design.md, deviation 2).
+        """
+        if newer.id != self.id:
+            raise ValueError(f"{newer.id!r} is not another observation of {self.id!r}")
+        return KnownObject(
+            id=self.id,
+            attributes={**self.attributes, **newer.attributes},
+            owner_id=newer.owner_id if newer.owner_id is not None else self.owner_id,
+        )
+
+
+def observe(world: dict[str, KnownObject], objects: Iterable[KnownObject]) -> None:
+    """Record objects a tool result returned, folding repeats into what is known."""
+    for obj in objects:
+        existing = world.get(obj.id)
+        world[obj.id] = obj if existing is None else existing.observed_again(obj)
+
 
 class DomainConstraints(BaseModel):
     """Everything the validator needs to know about one domain.
@@ -403,7 +427,7 @@ def world_from(objects: Iterable[KnownObject]) -> dict[str, KnownObject]:
     picking one silently would decide which world the checks run against.
 
     Re-reading an object whose state has since changed is a different thing --
-    assign into the mapping, where last-wins is the intended meaning.
+    use :func:`observe`, which folds the newer reading into the known one.
     """
     world: dict[str, KnownObject] = {}
     for obj in objects:

@@ -68,7 +68,7 @@ from policygate.harness.types import (
     ToolKind,
     ToolRole,
 )
-from policygate.harness.validation import DomainConstraints, KnownObject, Validator
+from policygate.harness.validation import DomainConstraints, KnownObject, Validator, observe
 
 AGENT_INSTRUCTION = """
 You are a customer service agent that helps the user according to the <policy> provided below.
@@ -223,12 +223,7 @@ class HarnessAgent(HalfDuplexAgent[HarnessAgentState]):
             return
         facts = self.extract_facts(name, result.content, error=result.error)
 
-        if facts.objects:
-            for obj in facts.objects:
-                existing = state.world.get(obj.id)
-                # Later observations win: a cancelled order really is cancelled
-                # now, and the earlier reading is history, not a contradiction.
-                state.world[obj.id] = obj if existing is None else obj
+        observe(state.world, facts.objects)
         try:
             if facts.user_id:
                 state.tracker.record_identity(facts.user_id)

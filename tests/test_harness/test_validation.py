@@ -19,6 +19,7 @@ from policygate.harness.validation import (
     Precondition,
     Validator,
     ValueConstraint,
+    observe,
     world_from,
 )
 
@@ -414,3 +415,32 @@ class TestWorldFrom:
         world = world_from([KnownObject(id="#W1", attributes={"status": "pending"})])
         world["#W1"] = KnownObject(id="#W1", attributes={"status": "cancelled"})
         assert world["#W1"].attributes["status"] == "cancelled"
+
+
+class TestRepeatedObservations:
+    """W4 v2: a profile listing replaced an order fetched earlier and erased its status."""
+
+    def test_a_listing_without_status_keeps_the_status_already_retrieved(self):
+        world = {}
+        observe(world, [PENDING])
+        observe(world, [KnownObject(id=PENDING.id, owner_id=USER)])  # get_user_details
+        assert world[PENDING.id].attributes == {"status": "pending"}
+
+    def test_a_newer_status_replaces_the_old_one(self):
+        world = {}
+        observe(world, [PENDING])
+        observe(world, [KnownObject(id=PENDING.id, attributes={"status": "cancelled"})])
+        assert world[PENDING.id].attributes["status"] == "cancelled"
+        assert world[PENDING.id].owner_id == USER  # not erased by a result that omits it
+
+    def test_the_write_is_not_refused_after_the_profile_is_read_again(self):
+        world = {}
+        observe(world, [PENDING])
+        observe(world, [KnownObject(id=PENDING.id, owner_id=USER)])
+        assert validator().review(call("cancel_pending_order", order_id=PENDING.id),
+                                  subject=USER, world=world).passed
+
+    def test_two_different_objects_cannot_be_folded(self):
+        with pytest.raises(ValueError, match="not another observation"):
+            PENDING.observed_again(DELIVERED)
+

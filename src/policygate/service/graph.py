@@ -44,7 +44,7 @@ from policygate.harness.types import (
     DecisionOutcome,
     ToolRole,
 )
-from policygate.harness.validation import KnownObject
+from policygate.harness.validation import KnownObject, observe
 from policygate.service.runtime import RetailRuntime, dump, to_message
 
 
@@ -241,8 +241,7 @@ def build_graph(runtime: RetailRuntime, checkpointer: Any):
                 if spec is not None and spec.role is ToolRole.ESCALATION:
                     step.tracker.record_transfer()
             facts = runtime.extract_facts(call.name, result.content, error=result.error)
-            for obj in facts.objects:
-                step.world[obj.id] = obj
+            observe(step.world, facts.objects)
             try:
                 if facts.user_id:
                     step.tracker.record_identity(facts.user_id)

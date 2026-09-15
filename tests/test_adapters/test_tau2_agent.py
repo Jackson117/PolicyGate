@@ -285,6 +285,28 @@ class TestValidationRefusals:
         assert [c.name for c in message.tool_calls or []] == ["return_delivered_order_items"]
         assert not [r for r in state.chain.records if r.event is AuditEvent.TOOL_DENIED]
 
+    def test_reading_the_profile_again_does_not_erase_a_retrieved_status(
+        self, env, retail_db, monkeypatch
+    ):
+        """W4 v2 regression, end to end: fetch the order, list the user's orders,
+        then write. The listing carries no status and used to replace the order."""
+        llm = ScriptedLLM()
+        agent = build(env, retail_db, llm, monkeypatch)
+        state = verified_scoped(agent, llm, ORDER_PENDING)
+        llm.responses.append(calls("get_user_details", "p1", user_id="u1"))
+        agent.generate_next_message(UserMessage(role="user", content="my other orders?"), state)
+        llm.responses.append(says("You have one order."))
+        agent.generate_next_message(
+            tool_result("p1", json.dumps({"user_id": "u1", "orders": ["#W7387996"]})), state
+        )
+
+        llm.responses.extend([cancels("#W7387996"), says("fallback: the cancel was refused")])
+        message, _ = agent.generate_next_message(
+            UserMessage(role="user", content="cancel it"), state
+        )
+        assert [c.name for c in message.tool_calls or []] == ["cancel_pending_order"]
+        assert not [r for r in state.chain.records if r.event is AuditEvent.TOOL_DENIED]
+
     def test_a_write_to_another_users_order_is_refused(self, env, retail_db, monkeypatch):
         foreign = json.dumps({"order_id": "#W8000002", "status": "delivered", "user_id": "u2"})
         llm = ScriptedLLM()
