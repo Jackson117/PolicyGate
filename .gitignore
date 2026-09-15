@@ -20,6 +20,7 @@ venv/
 # ablation cell produces another.
 experiments/**/raw/
 experiments/**/results*.json
+experiments/**/sessions.jsonl
 experiments/**/figures/*.png
 
 # Vendored benchmark (pinned separately, see third_party/PIN.md)
