@@ -379,12 +379,30 @@ def _claim_directory(
         json.dumps(
             {
                 "fingerprint": plan.fingerprint(),
+                "run_id": uuid.uuid4().hex,
                 "provenance": current,
                 "plan": plan.model_dump(mode="json"),
             },
             indent=2,
         )
     )
+
+
+def run_id(out_dir: Path) -> str:
+    """The identity of the run claimed in ``out_dir``, which names tau2's checkpoints.
+
+    Not the plan fingerprint: tau2 resumes any checkpoint under the same
+    ``save_to``, so two directories running the same plan with different code
+    would share results. W4 v3 did exactly that -- its first two chunks were
+    v2's simulations, loaded from tau2's checkpoint without a model call.
+    """
+    stored = json.loads((out_dir / "plan.json").read_text())
+    if not stored.get("run_id"):
+        raise PlanMismatchError(
+            f"{out_dir}/plan.json has no run_id (written before checkpoints were "
+            "namespaced by run); start a new output directory"
+        )
+    return stored["run_id"]
 
 
 def run_plan(
@@ -677,8 +695,9 @@ class Tau2ChunkExecutor:
             max_concurrency=self.max_concurrency,
             hallucination_retries=plan.hallucination_retries,
             enforce_communication_protocol=plan.enforce_communication_protocol,
-            # Deterministic, so a re-invocation resumes the same checkpoint.
-            save_to=f"{plan.name}_{plan.fingerprint()[:10]}/{spec.key}",
+            # Stable within one claimed directory, so a re-invocation resumes its
+            # own checkpoint -- and only its own; see run_id.
+            save_to=f"{plan.name}_{run_id(self.out_dir)}/{spec.key}",
             auto_resume=True,
         )
 

@@ -42,6 +42,10 @@ def clean(code="code-v1"):
                     "code": code, "code_dirty": False}
 
 
+def claim(p, out_dir):
+    runner._claim_directory(p, out_dir, clean())
+
+
 @pytest.fixture(autouse=True)
 def committed_code(monkeypatch):
     """Scheduling tests must not depend on whether this checkout has uncommitted work."""
@@ -252,6 +256,37 @@ def test_resuming_with_the_same_code_proceeds(tmp_path):
     assert outcome.status is RunStatus.COMPLETE
 
 
+def test_two_directories_running_the_same_plan_never_share_tau2_checkpoints(tmp_path):
+    """W4 v3 regression: save_to was named by the plan fingerprint, which v2 and v3
+    shared, so tau2 resumed v2's simulations into v3 without calling the model."""
+    p = plan(chunk_size=10)
+    first, second = tmp_path / "v2", tmp_path / "v3"
+    claim(p, first)
+    claim(p, second)
+    spec = p.schedule()[0]
+    assert (Tau2ChunkExecutor(p, first).run_config(spec).save_to
+            != Tau2ChunkExecutor(p, second).run_config(spec).save_to)
+
+
+def test_a_resumed_directory_keeps_its_own_checkpoints(tmp_path):
+    p = plan(chunk_size=10)
+    claim(p, tmp_path)
+    spec = p.schedule()[0]
+    before = Tau2ChunkExecutor(p, tmp_path).run_config(spec).save_to
+    claim(p, tmp_path)  # a later invocation re-claims the same directory
+    assert Tau2ChunkExecutor(p, tmp_path).run_config(spec).save_to == before
+
+
+def test_a_directory_claimed_before_run_ids_cannot_resume(tmp_path):
+    p = plan(chunk_size=10)
+    claim(p, tmp_path)
+    stored = json.loads((tmp_path / "plan.json").read_text())
+    del stored["run_id"]
+    (tmp_path / "plan.json").write_text(json.dumps(stored))
+    with pytest.raises(PlanMismatchError, match="no run_id"):
+        Tau2ChunkExecutor(p, tmp_path).run_config(p.schedule()[0])
+
+
 @pytest.mark.parametrize("identity", [
     {"code": "code-v1", "code_dirty": True},
     {"code": None, "code_dirty": False},
@@ -347,6 +382,7 @@ def test_records_join_to_the_simulation_tau2_produced(tmp_path, monkeypatch):
     )
 
     p = plan(chunk_size=10)
+    claim(p, tmp_path)
     executor = Tau2ChunkExecutor(p, tmp_path, max_concurrency=1)
     spec = next(c for c in p.schedule() if c.arm == "full")
     config = executor.run_config(spec)
@@ -379,6 +415,7 @@ def test_an_attempt_is_written_once_however_often_stop_is_called(tmp_path, monke
     from tau2.registry import registry
 
     p = plan(chunk_size=10)
+    claim(p, tmp_path)
     executor = Tau2ChunkExecutor(p, tmp_path, max_concurrency=1)
     factory = registry.get_agent_factory(executor.run_config(p.schedule()[0]).agent)
     env = registry.get_env_constructor("retail")()
@@ -397,6 +434,7 @@ def test_a_missing_seed_is_written_visibly_rather_than_raised(tmp_path):
     from policygate.eval.runner import MISSING_SEED
 
     p = plan(chunk_size=10)
+    claim(p, tmp_path)
     executor = Tau2ChunkExecutor(p, tmp_path, max_concurrency=1)
     factory = registry.get_agent_factory(executor.run_config(p.schedule()[0]).agent)
     env = registry.get_env_constructor("retail")()
