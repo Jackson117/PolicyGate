@@ -300,23 +300,61 @@ class RunOutcome(BaseModel):
     unaccounted: tuple[str, ...] = UNACCOUNTED
 
 
-def _provenance() -> dict[str, Any]:
-    def git(*args: str) -> str | None:
-        try:
-            return subprocess.run(
-                ["git", *args], capture_output=True, text=True, check=True, timeout=10
-            ).stdout.strip()
-        except (OSError, subprocess.SubprocessError):
-            return None
+RESULT_PATHS = ("src/policygate/harness", "src/policygate/adapters", "src/policygate/eval",
+                "uv.lock")
+"""What decides a simulation's outcome. viz, service and docs can change mid-run."""
 
+TAU2_CHECKOUT = "third_party/tau2-bench"
+
+
+def _git(*args: str, cwd: str | None = None) -> str | None:
+    try:
+        return subprocess.run(
+            ["git", *args], capture_output=True, text=True, check=True, timeout=10, cwd=cwd
+        ).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def _provenance() -> dict[str, Any]:
+    """Where the run's code came from.
+
+    ``code`` identifies only what decides outcomes: the committed trees of
+    RESULT_PATHS and the tau2 checkout's commit. The plan fingerprint does not
+    cover code, so W4 v1 could have been resumed after a harness fix with old
+    and new chunks silently mixed; ``code`` is what the resume check compares.
+
+    ``code_dirty`` ignores untracked files -- v1 was marked dirty by its own
+    run.log -- and anything outside RESULT_PATHS.
+    """
+    root = _git("rev-parse", "--show-toplevel") or "."
+    checkout = str(Path(root) / TAU2_CHECKOUT)
+    trees = [_git("rev-parse", f"HEAD:{path}", cwd=root) for path in RESULT_PATHS]
+    tau2 = _git("rev-parse", "HEAD", cwd=checkout)
+    local = _git("status", "--porcelain", "--untracked-files=no", "--", *RESULT_PATHS, cwd=root)
+    vendored = _git("status", "--porcelain", "--untracked-files=no", cwd=checkout)
+    code = None
+    if all(trees) and tau2 and local is not None and vendored is not None:
+        code = sha256_hex("\n".join([*trees, tau2]))
     return {
         "started_at": datetime.now(UTC).isoformat(),
-        "commit": git("rev-parse", "HEAD"),
-        "dirty": bool(git("status", "--porcelain")),
+        "commit": _git("rev-parse", "HEAD", cwd=root),
+        "tau2_commit": tau2,
+        "code": code,
+        "code_dirty": bool(local) or bool(vendored),
     }
 
 
-def _claim_directory(plan: RunPlan, out_dir: Path) -> None:
+def _claim_directory(
+    plan: RunPlan, out_dir: Path, provenance: Callable[[], dict[str, Any]] = _provenance
+) -> None:
+    current = provenance()
+    if current.get("code") is None or current.get("code_dirty"):
+        raise PlanMismatchError(
+            "the code that decides outcomes is uncommitted or unidentifiable "
+            f"({', '.join(RESULT_PATHS)}, {TAU2_CHECKOUT}); commit it before running, "
+            "or the results cannot be traced to a version"
+        )
     out_dir.mkdir(parents=True, exist_ok=True)
     plan_path = out_dir / "plan.json"
     if plan_path.exists():
@@ -326,12 +364,18 @@ def _claim_directory(plan: RunPlan, out_dir: Path) -> None:
                 f"{out_dir} holds a different plan; refusing to mix results. "
                 "Use a new output directory."
             )
+        if stored.get("provenance", {}).get("code") != current["code"]:
+            raise PlanMismatchError(
+                f"{out_dir} was started with different code "
+                f"(commit {stored.get('provenance', {}).get('commit')}); resuming would mix "
+                "results from two versions. Use a new output directory."
+            )
         return
     plan_path.write_text(
         json.dumps(
             {
                 "fingerprint": plan.fingerprint(),
-                "provenance": _provenance(),
+                "provenance": current,
                 "plan": plan.model_dump(mode="json"),
             },
             indent=2,
@@ -348,6 +392,7 @@ def run_plan(
     prior_cost_per_simulation: float = PRIOR_COST_PER_SIMULATION,
     max_infrastructure_share: float = 0.2,
     repair_passes: int = 1,
+    provenance: Callable[[], dict[str, Any]] = lambda: _provenance(),
 ) -> RunOutcome:
     """Execute the plan's chunks in order until done, out of budget, or failing.
 
@@ -359,7 +404,7 @@ def run_plan(
     ``max_infrastructure_share`` the run stops, because a provider failing at
     that rate fails *after* each conversation has been paid for.
     """
-    _claim_directory(plan, out_dir)
+    _claim_directory(plan, out_dir, provenance)
     ledger_path = out_dir / "ledger.json"
     ledger = Ledger.load(ledger_path, plan.fingerprint())
 

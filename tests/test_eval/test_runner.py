@@ -16,6 +16,7 @@ from tau2.data_model.message import AssistantMessage, ToolCall
 from tau2.data_model.simulation import SimulationRun, TerminationReason
 from tau2.utils.utils import DATA_DIR
 
+from policygate.eval import runner
 from policygate.eval.runner import (
     ChunkReport,
     ChunkSpec,
@@ -33,6 +34,18 @@ from policygate.eval.runner import (
 from policygate.harness.config import HarnessConfig
 
 TASKS = tuple(str(i) for i in range(10))
+REAL_PROVENANCE = runner._provenance
+
+
+def clean(code="code-v1"):
+    return lambda: {"started_at": "t", "commit": "c", "tau2_commit": "t2",
+                    "code": code, "code_dirty": False}
+
+
+@pytest.fixture(autouse=True)
+def committed_code(monkeypatch):
+    """Scheduling tests must not depend on whether this checkout has uncommitted work."""
+    monkeypatch.setattr(runner, "_provenance", clean())
 
 
 def plan(**overrides) -> RunPlan:
@@ -216,7 +229,54 @@ def test_the_plan_file_records_provenance(tmp_path):
     run_plan(plan(), tmp_path, budget_usd=0.1, executor=FakeExecutor())
     stored = json.loads((tmp_path / "plan.json").read_text())
     assert stored["fingerprint"] == plan().fingerprint()
-    assert {"commit", "dirty", "started_at"} <= set(stored["provenance"])
+    assert {"commit", "tau2_commit", "code", "code_dirty", "started_at"} <= set(
+        stored["provenance"]
+    )
+
+
+def test_resuming_with_different_code_is_refused(tmp_path):
+    """W4 v1: the plan fingerprint does not cover code, so a harness fix followed
+    by a resume in the same directory would have mixed two versions' chunks."""
+    run_plan(plan(), tmp_path, budget_usd=0.02, executor=FakeExecutor(), provenance=clean())
+    executor = FakeExecutor()
+    with pytest.raises(PlanMismatchError, match="different code"):
+        run_plan(plan(), tmp_path, budget_usd=100, executor=executor,
+                 provenance=clean("code-v2"))
+    assert executor.calls == []
+
+
+def test_resuming_with_the_same_code_proceeds(tmp_path):
+    run_plan(plan(), tmp_path, budget_usd=0.02, executor=FakeExecutor(), provenance=clean())
+    outcome = run_plan(plan(), tmp_path, budget_usd=100, executor=FakeExecutor(),
+                       provenance=clean())
+    assert outcome.status is RunStatus.COMPLETE
+
+
+@pytest.mark.parametrize("identity", [
+    {"code": "code-v1", "code_dirty": True},
+    {"code": None, "code_dirty": False},
+])
+def test_uncommitted_or_unidentifiable_code_does_not_start(tmp_path, identity):
+    executor = FakeExecutor()
+    with pytest.raises(PlanMismatchError, match="uncommitted or unidentifiable"):
+        run_plan(plan(), tmp_path, budget_usd=100, executor=executor,
+                 provenance=lambda: {**clean()(), **identity})
+    assert executor.calls == [] and not (tmp_path / "plan.json").exists()
+
+
+def test_untracked_files_do_not_make_the_code_dirty(tmp_path, monkeypatch):
+    """v1 was recorded dirty because its own run.log was untracked."""
+    seen = []
+
+    def git(*args, cwd=None):
+        seen.append(args)
+        return "" if args[0] == "status" else "abc"
+
+    monkeypatch.setattr(runner, "_git", git)
+    identity = REAL_PROVENANCE()
+    assert identity["code_dirty"] is False and identity["code"]
+    statuses = [a for a in seen if a[0] == "status"]
+    assert statuses and all("--untracked-files=no" in a for a in statuses)
 
 
 # --- measuring a chunk ----------------------------------------------------
