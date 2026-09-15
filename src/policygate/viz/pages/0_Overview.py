@@ -19,12 +19,19 @@ t = theme()
 provenance = run.provenance
 st.caption(
     f"plan `{run.fingerprint[:12]}` · commit `{(provenance.get('commit') or '?')[:10]}`"
-    + (" · **working tree dirty at start**" if provenance.get("dirty") else "")
+    # v2 records `code_dirty` (outcome code only); v1 recorded `dirty`, which
+    # untracked files such as run.log also set.
+    + (" · **outcome code uncommitted at start**"
+       if provenance.get("code_dirty", provenance.get("dirty")) else "")
 )
 
 baseline, full = run.arm("baseline"), run.arm("full")
 if not (baseline and full and baseline.simulations and full.simulations):
-    st.info("The headline arms have no completed chunks yet.")
+    counts = ", ".join(
+        f"{arm.name} {len({s.task_id for s in arm.simulations})} tasks"
+        for arm in (baseline, full) if arm is not None
+    )
+    st.info(f"The comparison needs both headline arms to have a closed chunk ({counts}).")
     st.stop()
 
 metric = st.radio("Reward", ["reward", "DB"], horizontal=True,
