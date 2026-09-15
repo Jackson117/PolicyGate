@@ -10,7 +10,7 @@ import streamlit as st
 from policygate.viz.data import RunView, load_run
 from policygate.viz.theme import Tokens, tokens
 
-DEFAULT_RUN = Path(os.environ.get("POLICYGATE_RUN_DIR", "experiments/w4_v2"))
+DEFAULT_RUN = Path(os.environ.get("POLICYGATE_RUN_DIR", "experiments/w4_v3"))
 
 
 @st.cache_resource(show_spinner="Loading run…")
