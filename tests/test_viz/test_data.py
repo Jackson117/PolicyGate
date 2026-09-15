@@ -152,3 +152,41 @@ def test_refused_proposals_are_exposed_by_call_id():
     events = harness_events_by_call(session("1", 0, denied_rule="validation.refused"))
     assert events["refused-1"][0]["rule"] == "validation.refused"
     assert harness_events_by_call(None) == {}
+
+
+def test_a_live_run_shows_only_chunks_the_ledger_has_closed(tmp_path, monkeypatch):
+    """runner.load_arm globs every results file, including the one tau2 is still
+    writing; the dashboard watches live runs, so it must not."""
+    import json
+
+    from tau2.data_model.simulation import Results
+
+    from policygate.viz.data import load_run
+
+    arms = [{"phase": "headline", "trials": 5, "config": {"name": n}} for n in ("baseline", "full")]
+    (tmp_path / "plan.json").write_text(json.dumps(
+        {"fingerprint": "f", "provenance": {}, "plan": {"arms": arms}}))
+    (tmp_path / "ledger.json").write_text(json.dumps({
+        "plan_fingerprint": "f",
+        "complete": {"baseline/chunk_000": {}, "full/chunk_000": {}, "baseline/chunk_001": {}},
+        "incomplete": {},
+    }))
+    for arm, chunks in (("baseline", 2), ("full", 2)):
+        (tmp_path / arm).mkdir()
+        for i in range(chunks):
+            (tmp_path / arm / f"results_chunk_{i:03d}.json").write_text("{ half-writ")
+
+    loaded = []
+
+    class Fake:
+        def __init__(self, path):
+            self.simulations = [sim(path.name, 0, 1.0)]
+
+    monkeypatch.setattr(Results, "load", classmethod(lambda cls, path: loaded.append(
+        f"{path.parent.name}/{path.name}") or Fake(path)))
+
+    run = load_run(tmp_path)
+    assert sorted(loaded) == ["baseline/results_chunk_000.json",
+                              "baseline/results_chunk_001.json",
+                              "full/results_chunk_000.json"]
+    assert len(run.arm("full").simulations) == 1

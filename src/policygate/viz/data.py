@@ -82,15 +82,27 @@ class RunView(BaseModel):
 
 def load_run(out_dir: Path) -> RunView:
     """Read a runner output directory. Chunks still in flight are not included."""
-    from policygate.eval.runner import load_arm
+    from tau2.data_model.simulation import Results
+
+    from policygate.eval.runner import kept_sessions, read_sessions
 
     stored = json.loads((out_dir / "plan.json").read_text())
     ledger_path = out_dir / "ledger.json"
     ledger = json.loads(ledger_path.read_text()) if ledger_path.exists() else {}
+    # Only chunks the ledger has closed. eval.runner.load_arm globs every results
+    # file, including one tau2 is still writing: during a live run that shows a
+    # partial chunk (biasing pass^k for the arm in flight) or a half-written file.
+    closed = {*ledger.get("complete", {}), *ledger.get("incomplete", {})}
     arms = []
     for arm in stored["plan"]["arms"]:
         name = arm["config"]["name"]
-        simulations, sessions = load_arm(out_dir, name)
+        simulations = [
+            sim
+            for key in sorted(k for k in closed if k.startswith(f"{name}/"))
+            for sim in Results.load(out_dir / name / f"results_{key.split('/', 1)[1]}.json")
+            .simulations
+        ]
+        sessions = kept_sessions(read_sessions(out_dir / name / "sessions.jsonl"))
         arms.append(
             ArmData(
                 name=name,
