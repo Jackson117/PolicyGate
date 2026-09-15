@@ -46,6 +46,8 @@ def test_pass_k_curve_has_one_axis_a_legend_and_drawn_intervals():
     assert sum(1 for tr in fig.data if tr.showlegend is not False) == 2
     washes = [tr for tr in fig.data if tr.fill == "toself"]
     assert len(washes) == 2 and all("0.1)" in tr.fillcolor for tr in washes)
+    # Left unset, plotly marks a short trace's points in the colorway's next hues.
+    assert all(tr.mode == "lines" for tr in washes)
     assert fig.layout.plot_bgcolor == DARK.surface
 
 
@@ -87,5 +89,15 @@ def test_the_frontier_names_only_the_headline_arms():
 
 
 def test_rule_bars_put_the_longest_on_top():
-    fig = charts.rule_bars({"a": 1, "b": 9, "c": 4}, LIGHT, title="x")
+    fig = charts.rule_bars({"a": 1, "b": 9, "c": 4}, LIGHT, arm="full", title="x")
     assert list(fig.data[0].y) == ["a", "c", "b"]
+
+
+def test_rule_bars_wear_the_arm_s_colour_not_the_headline_s():
+    fig = charts.rule_bars({"a": 1}, LIGHT, arm="baseline", title="x")
+    assert fig.data[0].marker.color == LIGHT.baseline
+
+
+def test_category_labels_get_room_instead_of_being_clipped():
+    fig = charts.rule_bars({"gating.one_call_per_turn": 3}, LIGHT, arm="full", title="x")
+    assert fig.layout.yaxis.automargin is True

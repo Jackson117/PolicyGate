@@ -46,8 +46,8 @@ with right:
     for row in rows:
         by_rule.update(row["denials_by_rule"])
     if by_rule:
-        st.plotly_chart(charts.rule_bars(by_rule, t, title=f"Refusals by rule · {chosen}"),
-                        width="stretch", theme=None)
+        figure = charts.rule_bars(by_rule, t, arm=chosen, title=f"Refusals by rule · {chosen}")
+        st.plotly_chart(figure, width="stretch", theme=None)
     else:
         st.info("No refusals recorded in this arm.")
 

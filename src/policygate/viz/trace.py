@@ -18,6 +18,11 @@ def _refused(events: dict[str, list[dict[str, Any]]], trajectory_ids: set[str]) 
     ]
 
 
+def _plain(text: str) -> str:
+    """Stop Streamlit reading a pair of dollar signs as LaTeX."""
+    return text.replace("$", "\\$")
+
+
 def render_trajectory(
     sim: Any, events: dict[str, list[dict[str, Any]]], *, collapse_before: int | None = None
 ) -> None:
@@ -37,11 +42,11 @@ def render_trajectory(
     refused = _refused(events, trajectory_ids)
     if refused:
         with st.expander(f"{len(refused)} refused proposal(s) — never reached tau2", expanded=True):
-            st.dataframe(
-                [{"seq": e["seq"], "tool": e["tool"], "rule": e["rule"], "reason": e["reason"],
-                  "arguments": json.dumps(e["arguments"])} for e in refused],
-                hide_index=True,
-            )
+            # Rows, not a table: in a half-width column a table hides the reason
+            # behind a horizontal scroll, and the reason is what the reader came for.
+            for e in refused:
+                st.markdown(f"`{e['seq']}` **{e['tool']}** · `{e['rule']}`")
+                st.caption(_plain(f"{e['reason']} — {json.dumps(e['arguments'])}"))
 
     start = collapse_before or 0
     if start:
@@ -62,7 +67,7 @@ def _message(m: Any, events: dict[str, list[dict[str, Any]]]) -> None:
             st.code((m.content or "")[:1500], language="json")
             return
         if getattr(m, "content", None):
-            st.markdown(m.content)
+            st.markdown(_plain(m.content))
         for c in calls:
             decisions = [e["rule"] for e in events.get(c.id, []) if e["rule"]]
             st.caption(f"→ `{c.name}`" + (f" · {', '.join(decisions)}" if decisions else ""))

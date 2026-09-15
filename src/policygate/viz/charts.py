@@ -33,6 +33,9 @@ def _layout(fig: go.Figure, t: Tokens, *, title: str, height: int = 360) -> go.F
         showgrid=True, gridcolor=t.grid, gridwidth=1, zeroline=False,
         linecolor=t.axis, linewidth=1, showline=True, ticks="outside", tickcolor=t.axis,
         tickfont=dict(color=t.muted), title_font=dict(color=t.text_secondary),
+        # Category labels (rule ids, "sometimes") are wider than the fixed margin;
+        # without automargin they are clipped or run into the axis title.
+        automargin=True, title_standoff=12,
     )
     fig.update_layout(
         title=dict(text=title, font=dict(color=t.text_primary, size=15), x=0, xanchor="left"),
@@ -61,7 +64,9 @@ def pass_k_curve(curves: Mapping[str, Sequence[Estimate]], t: Tokens) -> go.Figu
         fig.add_trace(go.Scatter(
             x=ks + ks[::-1],
             y=[e.hi for e in estimates] + [e.lo for e in estimates][::-1],
-            fill="toself", fillcolor=rgba(color, 0.10), line=dict(width=0),
+            # mode must be explicit: plotly draws markers on short traces by default,
+            # which paints the interval's corners in the colorway's next hues.
+            mode="lines", fill="toself", fillcolor=rgba(color, 0.10), line=dict(width=0),
             hoverinfo="skip", showlegend=False, name=f"{arm} interval",
         ))
         fig.add_trace(go.Scatter(
@@ -79,7 +84,10 @@ def pass_k_curve(curves: Mapping[str, Sequence[Estimate]], t: Tokens) -> go.Figu
             xanchor="left", xshift=10, font=dict(color=t.text_secondary),
         )
     fig = _layout(fig, t, title="pass^k by arm")
-    fig.update_xaxes(title_text="k (trials that must all succeed)", dtick=1)
+    # Pin the range to the measured k: autorange pads to an empty k+1 tick.
+    top = max((len(e) for e in curves.values()), default=1)
+    fig.update_xaxes(title_text="k (trials that must all succeed)", dtick=1,
+                     range=[0.7, top + 0.3])
     fig.update_yaxes(title_text="pass^k", range=[0, 1])
     return fig
 
@@ -175,12 +183,12 @@ def cost_frontier(
     return fig
 
 
-def rule_bars(counts: Mapping[str, int], t: Tokens, *, title: str) -> go.Figure:
-    """Refusals by rule, one series, longest first; value at the bar tip."""
+def rule_bars(counts: Mapping[str, int], t: Tokens, *, arm: str, title: str) -> go.Figure:
+    """Refusals by rule for one arm, longest first; value at the bar tip, arm's colour."""
     items = sorted(counts.items(), key=lambda kv: kv[1])
     fig = go.Figure(go.Bar(
         x=[v for _, v in items], y=[k for k, _ in items], orientation="h",
-        marker=dict(color=t.full, cornerradius=4), width=0.6,
+        marker=dict(color=t.arm_color(arm), cornerradius=4), width=0.6,
         text=[str(v) for _, v in items], textposition="outside",
         textfont=dict(color=t.text_secondary), cliponaxis=False,
         hovertemplate="%{y}<br>%{x} refusals<extra></extra>",
