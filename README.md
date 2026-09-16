@@ -8,9 +8,9 @@ user simulator, change only the harness, and measure what that is worth — with
 the ablation, the intervals, and the failures that the measurement itself
 turned up.
 
-The answer, over four runs, 3360 simulations and $49.39: **the harness enforces
-the policy completely and does not improve the task success rate.** Both halves
-are reported below, along with two harness defects the audit trail caught while
+The answer, over 4158 simulations and $61.25: **the harness enforces the policy
+completely and does not improve the task success rate.** Both halves are
+reported below, along with two harness defects the audit trail caught while
 being measured.
 
 ---
@@ -65,6 +65,12 @@ Design and pre-registration: [`docs/w4_design.md`](docs/w4_design.md).
 | one-call-per-turn violations | **0.000** | 0.737 | enforced by construction |
 | assistant turns | 15.13 | 13.25 | +14% |
 | cost per simulation | $0.0162 | $0.0141 | +15% |
+
+Switching the seven mechanisms on one at a time, over all 114 tasks, puts none
+of them past a multiple-comparison correction — and the arm that fires most,
+one-call-per-turn (399 refusals), is where the extra turns come from. The arm
+that never fires at all still scores +0.105, which is the honest measure of
+this design's noise.
 
 **The success-rate result is a null**, and the power analysis says why: this
 design can detect +7.3pp, and the effect is about 3pp. What is not a null is the

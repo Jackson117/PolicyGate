@@ -1,0 +1,384 @@
+{
+  "plan_fingerprint": "737f7e15846ce27de8d1f95ebd367746d5481a031dbc1e5297243565f07ab1ac",
+  "complete": {
+    "baseline/chunk_000": {
+      "key": "baseline/chunk_000",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.1675384,
+      "user_cost": 0.2947028
+    },
+    "full/chunk_000": {
+      "key": "full/chunk_000",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.5289016,
+      "user_cost": 0.3018204
+    },
+    "baseline/chunk_001": {
+      "key": "baseline/chunk_001",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.0991271999999999,
+      "user_cost": 0.29999
+    },
+    "full/chunk_001": {
+      "key": "full/chunk_001",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.3903747999999998,
+      "user_cost": 0.30500679999999997
+    },
+    "baseline/chunk_002": {
+      "key": "baseline/chunk_002",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.0092324,
+      "user_cost": 0.2513376
+    },
+    "full/chunk_002": {
+      "key": "full/chunk_002",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.25196,
+      "user_cost": 0.2702752
+    },
+    "baseline/chunk_003": {
+      "key": "baseline/chunk_003",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.1771916,
+      "user_cost": 0.27660199999999996
+    },
+    "full/chunk_003": {
+      "key": "full/chunk_003",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.23684,
+      "user_cost": 0.2805988
+    },
+    "baseline/chunk_004": {
+      "key": "baseline/chunk_004",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.1235747999999999,
+      "user_cost": 0.28434159999999997
+    },
+    "full/chunk_004": {
+      "key": "full/chunk_004",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.3026404,
+      "user_cost": 0.27146159999999997
+    },
+    "baseline/chunk_005": {
+      "key": "baseline/chunk_005",
+      "simulations": 70,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.8160576,
+      "user_cost": 0.211272
+    },
+    "full/chunk_005": {
+      "key": "full/chunk_005",
+      "simulations": 70,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.9114175999999999,
+      "user_cost": 0.2009
+    },
+    "only_gating_enabled/chunk_000": {
+      "key": "only_gating_enabled/chunk_000",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.2986032,
+      "user_cost": 0.069834
+    },
+    "only_context_pruning_enabled/chunk_000": {
+      "key": "only_context_pruning_enabled/chunk_000",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.24700919999999998,
+      "user_cost": 0.0591944
+    },
+    "only_schema_check_enabled/chunk_000": {
+      "key": "only_schema_check_enabled/chunk_000",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.2465228,
+      "user_cost": 0.060617199999999996
+    },
+    "only_value_canonicalization_enabled/chunk_000": {
+      "key": "only_value_canonicalization_enabled/chunk_000",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.253548,
+      "user_cost": 0.056766
+    },
+    "only_referent_check_enabled/chunk_000": {
+      "key": "only_referent_check_enabled/chunk_000",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.2644032,
+      "user_cost": 0.060604399999999996
+    },
+    "only_precondition_check_enabled/chunk_000": {
+      "key": "only_precondition_check_enabled/chunk_000",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.2776596,
+      "user_cost": 0.0630796
+    },
+    "only_parallel_call_block_enabled/chunk_000": {
+      "key": "only_parallel_call_block_enabled/chunk_000",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.3110264,
+      "user_cost": 0.0564092
+    },
+    "only_gating_enabled/chunk_001": {
+      "key": "only_gating_enabled/chunk_001",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.2513892,
+      "user_cost": 0.0582824
+    },
+    "only_context_pruning_enabled/chunk_001": {
+      "key": "only_context_pruning_enabled/chunk_001",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.23624720000000002,
+      "user_cost": 0.0578172
+    },
+    "only_schema_check_enabled/chunk_001": {
+      "key": "only_schema_check_enabled/chunk_001",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.24267919999999998,
+      "user_cost": 0.057768799999999995
+    },
+    "only_value_canonicalization_enabled/chunk_001": {
+      "key": "only_value_canonicalization_enabled/chunk_001",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.21654959999999998,
+      "user_cost": 0.054438
+    },
+    "only_referent_check_enabled/chunk_001": {
+      "key": "only_referent_check_enabled/chunk_001",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.22593639999999998,
+      "user_cost": 0.0585268
+    },
+    "only_precondition_check_enabled/chunk_001": {
+      "key": "only_precondition_check_enabled/chunk_001",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.2352012,
+      "user_cost": 0.0614644
+    },
+    "only_parallel_call_block_enabled/chunk_001": {
+      "key": "only_parallel_call_block_enabled/chunk_001",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.27575479999999997,
+      "user_cost": 0.057036399999999994
+    },
+    "only_gating_enabled/chunk_002": {
+      "key": "only_gating_enabled/chunk_002",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.226038,
+      "user_cost": 0.055548
+    },
+    "only_context_pruning_enabled/chunk_002": {
+      "key": "only_context_pruning_enabled/chunk_002",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.207832,
+      "user_cost": 0.0528436
+    },
+    "only_schema_check_enabled/chunk_002": {
+      "key": "only_schema_check_enabled/chunk_002",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.2221696,
+      "user_cost": 0.053491199999999996
+    },
+    "only_value_canonicalization_enabled/chunk_002": {
+      "key": "only_value_canonicalization_enabled/chunk_002",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.20912239999999999,
+      "user_cost": 0.0491536
+    },
+    "only_referent_check_enabled/chunk_002": {
+      "key": "only_referent_check_enabled/chunk_002",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.1821192,
+      "user_cost": 0.048129599999999995
+    },
+    "only_precondition_check_enabled/chunk_002": {
+      "key": "only_precondition_check_enabled/chunk_002",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.24844239999999998,
+      "user_cost": 0.060556399999999996
+    },
+    "only_parallel_call_block_enabled/chunk_002": {
+      "key": "only_parallel_call_block_enabled/chunk_002",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.2656136,
+      "user_cost": 0.0553052
+    },
+    "only_gating_enabled/chunk_003": {
+      "key": "only_gating_enabled/chunk_003",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.2438464,
+      "user_cost": 0.0546344
+    },
+    "only_context_pruning_enabled/chunk_003": {
+      "key": "only_context_pruning_enabled/chunk_003",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.2514508,
+      "user_cost": 0.0570644
+    },
+    "only_schema_check_enabled/chunk_003": {
+      "key": "only_schema_check_enabled/chunk_003",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.2253752,
+      "user_cost": 0.054159599999999995
+    },
+    "only_value_canonicalization_enabled/chunk_003": {
+      "key": "only_value_canonicalization_enabled/chunk_003",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.2176676,
+      "user_cost": 0.0529192
+    },
+    "only_referent_check_enabled/chunk_003": {
+      "key": "only_referent_check_enabled/chunk_003",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.2472556,
+      "user_cost": 0.0636052
+    },
+    "only_precondition_check_enabled/chunk_003": {
+      "key": "only_precondition_check_enabled/chunk_003",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.236742,
+      "user_cost": 0.0542644
+    },
+    "only_parallel_call_block_enabled/chunk_003": {
+      "key": "only_parallel_call_block_enabled/chunk_003",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.2537744,
+      "user_cost": 0.0539932
+    },
+    "only_gating_enabled/chunk_004": {
+      "key": "only_gating_enabled/chunk_004",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.24116559999999998,
+      "user_cost": 0.0578684
+    },
+    "only_context_pruning_enabled/chunk_004": {
+      "key": "only_context_pruning_enabled/chunk_004",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.22735119999999998,
+      "user_cost": 0.0552756
+    },
+    "only_schema_check_enabled/chunk_004": {
+      "key": "only_schema_check_enabled/chunk_004",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.2440916,
+      "user_cost": 0.0557632
+    },
+    "only_value_canonicalization_enabled/chunk_004": {
+      "key": "only_value_canonicalization_enabled/chunk_004",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.2420784,
+      "user_cost": 0.0545212
+    },
+    "only_referent_check_enabled/chunk_004": {
+      "key": "only_referent_check_enabled/chunk_004",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.2313072,
+      "user_cost": 0.060036
+    },
+    "only_precondition_check_enabled/chunk_004": {
+      "key": "only_precondition_check_enabled/chunk_004",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.2220352,
+      "user_cost": 0.055207599999999996
+    },
+    "only_parallel_call_block_enabled/chunk_004": {
+      "key": "only_parallel_call_block_enabled/chunk_004",
+      "simulations": 20,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.24094759999999998,
+      "user_cost": 0.0508288
+    },
+    "only_gating_enabled/chunk_005": {
+      "key": "only_gating_enabled/chunk_005",
+      "simulations": 14,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.1604552,
+      "user_cost": 0.040754
+    },
+    "only_context_pruning_enabled/chunk_005": {
+      "key": "only_context_pruning_enabled/chunk_005",
+      "simulations": 14,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.1649672,
+      "user_cost": 0.0424548
+    },
+    "only_schema_check_enabled/chunk_005": {
+      "key": "only_schema_check_enabled/chunk_005",
+      "simulations": 14,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.1335408,
+      "user_cost": 0.035530799999999994
+    },
+    "only_value_canonicalization_enabled/chunk_005": {
+      "key": "only_value_canonicalization_enabled/chunk_005",
+      "simulations": 14,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.1524212,
+      "user_cost": 0.0394968
+    },
+    "only_referent_check_enabled/chunk_005": {
+      "key": "only_referent_check_enabled/chunk_005",
+      "simulations": 14,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.14023919999999998,
+      "user_cost": 0.0374676
+    },
+    "only_precondition_check_enabled/chunk_005": {
+      "key": "only_precondition_check_enabled/chunk_005",
+      "simulations": 14,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.1652044,
+      "user_cost": 0.0428584
+    },
+    "only_parallel_call_block_enabled/chunk_005": {
+      "key": "only_parallel_call_block_enabled/chunk_005",
+      "simulations": 14,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.20800159999999998,
+      "user_cost": 0.0403544
+    }
+  },
+  "incomplete": {}
+}
