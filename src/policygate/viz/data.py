@@ -69,6 +69,8 @@ class RunView(BaseModel):
     provenance: Mapping[str, Any]
     arms: tuple[ArmData, ...]
     ledger: Mapping[str, Any]
+    source: str = ""
+    """The directory this was read from, for labelling arms borrowed across runs."""
 
     def arm(self, name: str) -> ArmData | None:
         return next((a for a in self.arms if a.name == name), None)
@@ -117,6 +119,7 @@ def load_run(out_dir: Path) -> RunView:
         provenance=stored["provenance"],
         arms=tuple(arms),
         ledger=ledger,
+        source=str(out_dir),
     )
 
 
@@ -254,6 +257,23 @@ def compare_arms(
     )
 
 
+def matched_to_baseline(
+    arm: ArmData, baseline: ArmData, **kwargs: Any
+) -> PairedComparison | None:
+    """Compare an arm with the baseline on the (task, trial) pairs both actually ran.
+
+    An attribution arm covers fewer tasks and fewer trials than the headline, so
+    its bare pass^1 is not comparable with the baseline's: the arms that ran
+    first happened to draw easier tasks, and reading one against the other put a
+    mechanism above the baseline that a matched comparison puts below it.
+    """
+    pairs = {(s.task_id, s.trial) for s in arm.simulations}
+    control = tuple(s for s in baseline.simulations if (s.task_id, s.trial) in pairs)
+    if not control:
+        return None
+    return compare_arms(arm, baseline.model_copy(update={"simulations": control}), **kwargs)
+
+
 # --- per task: migration and representativeness ---------------------------
 
 
@@ -383,6 +403,9 @@ def harness_events_by_call(session: SessionRecord | None) -> dict[str, list[dict
                 "arguments": dict(record.tool_call.arguments) if record.tool_call else None,
                 "rule": record.decision.rule if record.decision is not None else None,
                 "reason": record.decision.reason if record.decision is not None else None,
+                # What the model was told to do next -- the W4 v4 change, and the
+                # part a reader compares against what it actually did.
+                "remedy": record.decision.remedy if record.decision is not None else None,
             }
         )
     return grouped

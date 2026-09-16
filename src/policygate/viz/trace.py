@@ -47,6 +47,8 @@ def render_trajectory(
             for e in refused:
                 st.markdown(f"`{e['seq']}` **{e['tool']}** · `{e['rule']}`")
                 st.caption(_plain(f"{e['reason']} — {json.dumps(e['arguments'])}"))
+                if e.get("remedy"):
+                    st.caption(_plain(f"**Next:** {e['remedy']}"))
 
     start = collapse_before or 0
     if start:

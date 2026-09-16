@@ -190,3 +190,83 @@ def test_a_live_run_shows_only_chunks_the_ledger_has_closed(tmp_path, monkeypatc
                               "baseline/results_chunk_001.json",
                               "full/results_chunk_000.json"]
     assert len(run.arm("full").simulations) == 1
+
+
+def test_the_run_picker_lists_what_is_on_disk_newest_first(tmp_path):
+    """W4 left four run directories and comparing them is most of the analysis."""
+    import os
+    import time
+
+    from policygate.viz.session import discover_runs
+
+    for name, age in (("w4_v3", 200), ("w4_v4", 10), ("w4_ablation", 900)):
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "plan.json").write_text("{}")
+        ledger = tmp_path / name / "ledger.json"
+        ledger.write_text("{}")
+        stamp = time.time() - age
+        os.utime(ledger, (stamp, stamp))
+    (tmp_path / "not_a_run").mkdir()  # no plan.json
+
+    found = discover_runs(tmp_path, default=tmp_path / "w4_v3")
+    assert [p.name for p in found] == ["w4_v3", "w4_v4", "w4_ablation"]
+    assert [p.name for p in discover_runs(tmp_path, default=tmp_path / "absent")] == [
+        "w4_v4", "w4_v3", "w4_ablation"
+    ]
+
+
+def test_the_run_picker_is_empty_when_there_is_nothing_to_show(tmp_path):
+    from policygate.viz.session import discover_runs
+
+    assert discover_runs(tmp_path / "missing") == []
+
+
+def test_the_events_carry_what_the_model_was_told_to_do_next():
+    """W4 v4 put a remedy on every refusal; a trace that drops it cannot show
+    whether the model followed it."""
+    from policygate.harness.types import Decision, DecisionOutcome
+
+    chain = AuditChain("s1", lambda: datetime(2026, 1, 1), HarnessConfig.full())
+    chain.append(
+        AuditEvent.TOOL_DENIED,
+        tool_call=HarnessCall(id="c1", name="cancel_pending_order", arguments={}),
+        decision=Decision(outcome=DecisionOutcome.DENY, rule="validation.refused",
+                          reason="'#W1' has not been returned by any lookup",
+                          remedy="look '#W1' up first, then propose it again"),
+    )
+    record = SessionRecord(task_id="1", seed=1, session_id="s1", written_at="t", proposals=1,
+                           llm_cost=0.0, chain_intact=True, records=tuple(chain.records))
+    events = harness_events_by_call(record)
+    assert events["c1"][0]["remedy"] == "look '#W1' up first, then propose it again"
+
+
+def test_an_arm_is_matched_to_the_baseline_on_what_it_actually_ran():
+    """The attribution arms run fewer tasks and one trial; comparing their bare
+    pass^1 with the headline baseline's put a mechanism above a baseline that a
+    matched comparison puts below it."""
+    from policygate.viz.data import matched_to_baseline
+
+    # Baseline: 4 tasks x 2 trials. Tasks 1-2 are easy, 3-4 hard.
+    base = ArmData(name="baseline", phase="headline", trials=2, sessions={}, simulations=tuple(
+        sim(task, trial, 1.0 if task in ("1", "2") else 0.0)
+        for task in ("1", "2", "3", "4") for trial in (0, 1)
+    ))
+    # The arm only ran the easy tasks, trial 0, and lost one of them.
+    arm = ArmData(name="only_gating_enabled", phase="attribution", trials=1, sessions={},
+                  simulations=(sim("1", 0, 1.0), sim("2", 0, 0.0)))
+
+    assert sum(s.reward_info.reward for s in arm.simulations) / 2 == 0.5  # bare pass^1
+    c = matched_to_baseline(arm, base)
+    assert c.control == 1.0  # the baseline on those same tasks and trial
+    assert c.difference.value == -0.5
+    assert c.difference.n_tasks == 2
+
+
+def test_matching_an_arm_with_no_overlap_returns_nothing():
+    from policygate.viz.data import matched_to_baseline
+
+    base = ArmData(name="baseline", phase="headline", trials=1, sessions={},
+                   simulations=(sim("1", 0, 1.0),))
+    other = ArmData(name="only_gating_enabled", phase="attribution", trials=1, sessions={},
+                    simulations=(sim("99", 0, 1.0),))
+    assert matched_to_baseline(other, base) is None

@@ -5,7 +5,7 @@ from __future__ import annotations
 import streamlit as st
 
 from policygate.viz import charts
-from policygate.viz.data import compare_arms, summarise_arm
+from policygate.viz.data import compare_arms, matched_to_baseline, summarise_arm
 from policygate.viz.session import partial_run_notice, run_view, theme
 
 st.title("Overview")
@@ -59,6 +59,8 @@ if comparison.differential_exclusion:
         "exception types before reading the difference."
     )
 
+# One run per view. Arms from different runs were produced by different code --
+# that is why the runs are separate -- so they are never drawn on one axis.
 summaries = {a.name: summarise_arm(a) for a in run.arms if a.simulations}
 left, right = st.columns(2)
 with left:
@@ -74,11 +76,25 @@ with right:
     ]
     st.plotly_chart(charts.cost_frontier(points, t), width="stretch", theme=None)
 
+def matched(name: str) -> str | None:
+    """Every arm against the baseline, on the tasks and trials it actually ran."""
+    if name == "baseline":
+        return None
+    arm = run.arm(name)
+    c = matched_to_baseline(arm, baseline, component=component) if arm else None
+    if c is None:
+        return None
+    return f"{c.difference.value:+.3f} [{c.difference.lo:+.3f}, {c.difference.hi:+.3f}]"
+
+
 with st.expander("Table view"):
     st.dataframe(
         [
             {
                 "arm": name,
+                "tasks × trials": f"{len({sim.task_id for sim in run.arm(name).simulations})}"
+                                  f" × {run.arm(name).trials}",
+                "vs baseline (matched)": matched(name),
                 "simulations": s.simulations,
                 "excluded": sum(s.excluded.values()),
                 **{e.statistic: f"{e.value:.3f} [{e.lo:.3f}, {e.hi:.3f}]" for e in s.pass_k},
@@ -97,7 +113,10 @@ with st.expander("Table view"):
         hide_index=True,
     )
 st.caption(
-    "The parallel-call violation rate is zero by construction in any arm that enforces "
-    "the rule; it shows the mechanism is wired, not what it is worth. Text+call "
-    "violations are not enforced by the harness and serve as a side-effect check."
+    "Arms cover different tasks and trial counts, so their bare pass^1 is not comparable "
+    "across rows -- read the matched column, which pairs each arm with the baseline on the "
+    "tasks and trials it actually ran. The parallel-call violation rate is zero by "
+    "construction in any arm that enforces the rule; it shows the mechanism is wired, not "
+    "what it is worth. Text+call violations are not enforced by the harness and serve as a "
+    "side-effect check."
 )

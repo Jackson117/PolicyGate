@@ -10,7 +10,28 @@ import streamlit as st
 from policygate.viz.data import RunView, load_run
 from policygate.viz.theme import Tokens, tokens
 
-DEFAULT_RUN = Path(os.environ.get("POLICYGATE_RUN_DIR", "experiments/w4_v3"))
+DEFAULT_RUN = Path(os.environ.get("POLICYGATE_RUN_DIR", "experiments/w4_v4"))
+RUN_ROOT = Path(os.environ.get("POLICYGATE_RUN_ROOT", "experiments"))
+
+
+def discover_runs(root: Path = RUN_ROOT, *, default: Path = DEFAULT_RUN) -> list[Path]:
+    """Runner output directories, newest first, with ``default`` leading if present.
+
+    W4 left four of them (v1 through v4) and comparing runs is most of the
+    analysis, so the picker lists what is on disk instead of making the reader
+    remember directory names.
+    """
+    found = [p.parent for p in sorted(root.glob("*/plan.json"))] if root.exists() else []
+
+    def freshness(path: Path) -> float:
+        ledger = path / "ledger.json"
+        return ledger.stat().st_mtime if ledger.exists() else 0.0
+
+    found.sort(key=freshness, reverse=True)
+    if default in found:
+        found.remove(default)
+        found.insert(0, default)
+    return found
 
 
 @st.cache_resource(show_spinner="Loading run…")
@@ -21,7 +42,14 @@ def _load(path: str, version: float) -> RunView:
 
 
 def run_view() -> RunView | None:
-    path = Path(st.sidebar.text_input("Run directory", str(DEFAULT_RUN)))
+    runs = discover_runs()
+    options = [str(p) for p in runs] + ["other…"]
+    choice = st.sidebar.selectbox("Run", options, index=0 if runs else len(options) - 1)
+    path = Path(
+        st.sidebar.text_input("Run directory", str(DEFAULT_RUN))
+        if choice == "other…"
+        else choice
+    )
     if not (path / "plan.json").exists():
         st.warning(f"No runner output at `{path}`.")
         return None
