@@ -1,254 +1,184 @@
-# policygate — 项目文件架构
+# 架构：实际建成的样子
 
-> 项目名 `policygate` 是占位，取「policy + gating」之意，你可以改。
-> 全文假定包名与目录名一致，改名时记得同步 `pyproject.toml`。
-
----
-
-## 顶层
-
-```
-policygate/
-├── README.md                 # 门面：英雄图 + 结论 + 方法论章节
-├── pyproject.toml            # 依赖与包配置（Python >=3.12,<3.14）
-├── docker-compose.yml        # api + postgres + streamlit 一键起
-├── Dockerfile
-├── Makefile                  # make eval / make ablate / make viz / make test
-├── alembic.ini               # 审计库迁移配置
-├── .env.example              # API key 占位，绝不提交真 key
-├── .github/workflows/ci.yml  # pytest + ruff + 框架依赖检查 + 子集回归
-│
-├── src/policygate/           # 全部源码
-├── configs/                  # 实验配置（yaml）
-├── experiments/              # 实验产出（config + 原始结果 + 图）
-├── tests/
-├── scripts/
-├── docs/
-└── third_party/tau2-bench/   # pin 死版本的 fork（submodule 或 vendored）
-```
-
-`third_party/` 是刻意的：tau2 在活跃开发，内部 API 重构会影响自定义 agent 实现。
-fork 一份、pin 死 commit，不跟 main 走。
+本文描述**已经存在的代码**。原始设计稿里若干模块最终没有实现，第 6 节如实列出
+它们和不实现的理由。每个模块名都可以在 `src/policygate/` 里找到对应文件。
 
 ---
 
-## src/policygate/harness/ — 核心，零框架依赖
+## 1. 全景
 
-**这是项目的技术贡献所在。硬约束：这个目录不许 import LangGraph、LiteLLM、
-tau2 或任何 agent 框架，只依赖 Pydantic 和标准库。** CI 里加一条检查强制执行。
-
-这样做的三个理由：它是你的原创部分，交给框架实现等于外包掉唯一的亮点；
-纯函数可以脱离 LLM 做单元测试，pytest 秒过；能被多个 adapter 复用。
-
-```
-harness/
-├── types.py           # 共享数据模型：ToolCall / Decision / CheckResult /
-│                      #   ClauseRef / ApprovalRequest / AuditRecord
-├── config.py          # HarnessConfig：每个模块一个开关 —— 消融实验的支点
-├── state.py           # 会话状态定义与转移规则
-│                      #   （unverified → verified → scoped → pending_approval → …）
-├── gating.py          # 状态 → 合法工具子集。核心贡献 #1
-├── context.py         # 按状态裁剪 policy 文本与 tool schema（同时降 token 成本）
-├── guards.py          # 循环守卫：迭代上限 / token 预算 / 墙钟超时 / 重复动作检测
-├── validation.py      # Pydantic strict schema 校验 + 前置条件检查，
-│                      #   失败返回结构化拒绝而非抛异常
-├── idempotency.py     # 幂等键生成、重放检测、首次结果缓存。核心贡献 #2
-├── retry.py           # 失败分类：可重试（超时/网络）vs 不可重试（业务规则拒绝）
-├── compensation.py    # 写操作失败后的回滚与补偿
-├── approval.py        # 审批闸门 + 可插拔审批策略模拟器
-│                      #   （auto_approve / auto_reject / oracle / noisy_oracle）
-└── audit.py           # 审计记录器 + 哈希链。核心贡献 #3
-```
-
-### config.py 值得单独说
-
-消融实验的可行性完全取决于这个文件。每一个 harness 模块必须能独立开关：
-
-```python
-class HarnessConfig(BaseModel):
-    gating_enabled: bool = True
-    context_pruning_enabled: bool = True
-    idempotency_enabled: bool = True
-    precondition_check_enabled: bool = True
-    classified_retry_enabled: bool = True
-    compensation_enabled: bool = True
-    approval_gate_enabled: bool = True
-    loop_guards: LoopGuardConfig
-    approval_policy: Literal["auto_approve", "auto_reject", "oracle", "noisy_oracle"]
-    seed: int
+```mermaid
+flowchart TB
+    subgraph bench[评测路径]
+        O[τ² orchestrator] --> AD[adapters/tau2_agent.py<br/>HarnessAgent]
+        AD --> H
+        AD --> ENV[(τ² retail 环境<br/>世界状态 DB)]
+    end
+    subgraph deploy[部署路径]
+        API[service/api.py<br/>FastAPI] --> GR[service/graph.py<br/>LangGraph]
+        GR --> H
+        GR --> RT[service/runtime.py<br/>重放式世界重建]
+        RT --> ENV2[(τ² retail 环境<br/>每会话一份)]
+    end
+    subgraph H[harness/ — 零框架依赖]
+        direction LR
+        ST[state.py] --- GA[gating.py]
+        GA --- VA[validation.py]
+        VA --- AP[approval.py]
+        AP --- AU[audit.py]
+    end
+    H -.-> STORE[(store/<br/>审计库 Postgres)]
+    bench --> EV[eval/<br/>跑批与统计]
+    EV --> EXP[(experiments/<br/>plan + ledger + 结果)]
+    EXP --> VIZ[viz/<br/>Streamlit]
 ```
 
-一个开关漏掉，对应的消融行就跑不出来。**动手写模块之前先把这个类定完整。**
-
-### audit.py 的三个属性
-
-审计链不是日志。日志记录发生了什么，审计链**证明**发生了什么且未被篡改：
-
-- **完整性** — 每个改变世界状态的动作都有记录，无缺口
-- **关联性** — 每条挂上证据（doc_id + 条款号）、模型推理片段、审批记录、状态 diff
-- **可验证顺序** — 追加写、有序、每条带上一条的哈希，篡改即断链
-
-`world_diff` 直接用 `deepdiff`——它已经在 tau2 的核心依赖里，不用额外装。
+**两条路径共用同一套 harness**。评测路径里审批是一次函数调用，部署路径里是一个
+真人跨进程作出的决定——但门控、校验、审计走的是同一份代码，这是「部署的是被测过
+的那套逻辑」这句话成立的前提。
 
 ---
 
-## src/policygate/adapters/ — 接 tau2
+## 2. harness/ — 项目的贡献所在
 
+**硬约束：不许 import 任何 agent 框架**（LangGraph / LiteLLM / tau2 都不行），
+只依赖 pydantic、deepdiff 和标准库。`scripts/check_no_framework_deps.py` 在 CI 里
+强制检查，CI 还会在一个**完全没装这些框架**的环境里跑 176 个测试来证明这件事。
+
+| 文件 | 职责 |
+|---|---|
+| `types.py` | 共享模型：`ToolCall` / `Decision` / `CheckFailure` / `AuditRecord` / `ClauseRef` |
+| `config.py` | `HarnessConfig`：每个机制一个开关。消融的支点 |
+| `state.py` | 会话状态与合法转移：`UNVERIFIED → VERIFIED → SCOPED`，加上 `PENDING_APPROVAL` 与终态 `TRANSFERRED` |
+| `gating.py` | 状态 → 可见工具集；一轮一调用；每条拒绝归因到具体规则 |
+| `validation.py` | 参数 schema、枚举值规范化、写操作对象的存在与归属、业务前置条件 |
+| `approval.py` | 审批闸门与四种决策器（`auto_approve` / `auto_reject` / `oracle` / `noisy_oracle`） |
+| `audit.py` | 哈希链：完整性、关联性、可验证顺序 |
+
+### 一次提议的处理路径
+
+```mermaid
+flowchart LR
+    C[模型提议调用] --> T{一轮多调用?}
+    T -->|是| D1[整轮拒绝<br/>gating.one_call_per_turn]
+    T -->|否| S{当前状态<br/>允许这个工具?}
+    S -->|否| D2[拒绝<br/>identity_first 等]
+    S -->|是| V{校验通过?}
+    V -->|否| D3[拒绝<br/>validation.refused]
+    V -->|是| A{需要审批?}
+    A -->|是| W[挂起等待决定]
+    A -->|否| OK[交给环境执行]
+    D1 --> FB[拒绝消息 = 原因 + 下一步]
+    D2 --> FB
+    D3 --> FB
+    FB --> C
 ```
-adapters/
-├── tau2_agent.py      # 继承 HalfDuplexAgent，实现：
-│                      #   get_init_state(message_history) -> State
-│                      #   generate_next_message(message, state) -> (AssistantMessage, State)
-├── tool_mapping.py    # tau2 Tool 对象 ↔ harness 内部表示的转换
-└── prompts/           # system prompt 模板（按状态组装）
-```
 
-**注意 tau2 的执行模型**：orchestrator 拥有外层循环，工具由环境执行不由你执行。
-所以审批闸门拦在「模型提议调用」和「你返回 AssistantMessage」之间，
-不是拦在「工具执行前」。
+**「下一步」是一个独立字段，不是拼在原因里的一句话。** W4 v3 的数据显示：只说原因
+的拒绝，模型之后执行参考动作的比例是 30%，而环境自己报错时是 48%；69 次被拒的写
+操作只有 1 次被重试。加上可执行的下一步后升到 44%（见 `w4_results.md` 第 3 节）。
 
-先读 `examples/agents/` 和 `src/tau2/agent/llm_agent.py`，你的 adapter 是它的加强版。
+### 审计链为什么不是日志
+
+日志记录发生了什么，审计链**证明**发生了什么且未被篡改：每条记录挂上触发的规则与
+政策条款、决定、以及上一条的哈希。追加写、有序、篡改即断链。
+W4 两个 harness 缺陷都是靠「把每条拒绝与参考轨迹逐条比对」发现的，不是靠看总分。
 
 ---
 
-## src/policygate/service/ — 部署 demo
+## 3. adapters/ — 接 tau2
 
-benchmark 场景不需要 LangGraph（tau2 拥有循环，审批模拟器在进程内）。
-**但部署场景需要**：真人审批要跨请求、跨进程恢复，`interrupt()` + Postgres
-checkpointer 正是为此设计的。这里也是简历上 LangGraph 关键词的落点。
+τ²-bench 拥有外层循环，**工具由环境执行，不由 agent 执行**。所以闸门拦在
+「模型提议」与「返回 AssistantMessage」之间：被拒的调用根本不会到达环境，
+它只以一条 tool 消息的形式回到模型的上下文里。
 
-```
-service/
-├── graph.py           # LangGraph StateGraph，节点调用 harness/ 里的同一套逻辑
-├── api.py             # FastAPI：会话端点 + 审批端点（真人批准/驳回）
-├── checkpointer.py    # Postgres checkpointer 配置
-└── schemas.py         # 请求/响应模型
-```
+- `tau2_agent.py`：`HalfDuplexAgent` 的实现。提议 → 门控 → 校验 →（审批）→ 交付。
+  被拒时在进程内重试，最多 `max_internal_attempts` 次，之后升级人工。
+- `tool_mapping.py`：工具目录（kind 与 role）、调用转换、结果 → 事实提取、
+  从 db.json 与 policy.md 推出的域约束。
 
 ---
 
-## src/policygate/store/ — 审计持久化
+## 4. eval/ — 跑批与统计
 
-```
-store/
-├── models.py          # SQLAlchemy：audit_records / approvals / runs / trials
-├── repo.py            # 写入与查询
-└── migrations/        # alembic
+| 文件 | 职责 |
+|---|---|
+| `runner.py` | 分块跑批、预算闸、断点续跑、代码身份校验、会话记录落盘 |
+| `passk.py` | pass^k 点估计与 bootstrap 区间；配对 sign-flip 检验；剔除策略 |
+| `violations.py` | 政策条款违规率（harness 执行的与不执行的分别统计） |
+| `power.py` | beta-binomial 拟合 + 功效模拟 + 最小可检测效应 |
+
+跑批的三条设计，都是被真实事故逼出来的：
+
+```mermaid
+flowchart LR
+    P[plan.json<br/>指纹 + 代码身份 + run_id] --> R[按块执行]
+    R --> L[ledger.json<br/>每块的条数/错误/花费]
+    L --> B{预算还够?}
+    B -->|是| R
+    B -->|否| STOP[停止并报告]
+    R -.->|每块| CK[(tau2 检查点<br/>按 run_id 命名)]
 ```
 
-**红线**：审计库必须是独立的 Postgres，绝不能碰 tau2 的世界状态 DB。
-评分靠世界状态 DB 的哈希比对，你多写一个字节，全部任务判负。
+- **分块**：tau2 的批处理循环无法从外部中止，中断时它会 `os._exit`。所以每块自成
+  一次 tau2 运行，预算与停止判断发生在块之间。
+- **代码身份**：plan 指纹只覆盖实验配置，不覆盖代码。续跑时比对
+  `harness/`、`adapters/`、`eval/` 的已提交树与 tau2 commit，不一致则拒绝续跑；
+  代码未提交则拒绝启动。
+- **检查点按 run_id 命名**：曾经按 plan 指纹命名，导致一次跑批直接读入了上一版
+  代码的结果（`w4_design.md` 里作废的那次 v3 启动）。
 
 ---
 
-## src/policygate/eval/ — 跑批、指标、消融
+## 5. service/ 与 store/ — 部署
 
+benchmark 里审批是函数调用；部署里审批要**跨请求、跨进程**恢复，这正是
+LangGraph `interrupt` + checkpointer 的用途。
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant S as service/api.py
+    participant G as LangGraph
+    participant R as 审批人
+    U->>S: POST /sessions/{id}/messages
+    S->>G: invoke
+    G->>G: propose → review
+    G-->>S: interrupt(待审批)
+    S-->>U: 202 + pending approval
+    R->>S: POST /approvals/{request_id}
+    S->>G: Command(resume=决定)
+    G->>G: execute（副作用只发生一次）
+    G-->>S: 结果
 ```
-eval/
-├── runner.py          # 跑批编排：k 轮试验、并发、断点续跑、结果落盘
-├── passk.py           # pass^1 / pass^k 计算 + 置信区间（bootstrap）
-├── taxonomy.py        # 失败分类器，八类：
-│                      #   选错工具 / 参数错误 / 幻觉 / 工具超时 / 死循环 /
-│                      #   越权 / 该升级未升级 / 不该升级却升级
-├── ablation.py        # 消融矩阵编排：配置 × 域 × 模型 的笛卡尔积
-├── cost.py            # token / 美元 / 延迟统计
-└── report.py          # 出图：pass^k 曲线、消融热力图、失败迁移图、成本-可靠性前沿
-```
 
-### 两个指标必须分开报告
+两条关键性质：
 
-- **闸门触发率** — harness 决定「要不要问」，这是你的贡献
-- **审批通过率** — 模拟器决定「批不批」，这是外生的
+- **被中断的节点恢复时会从头重跑**，所以 `await_approval` 在调用 `interrupt` 之前
+  不做任何事，决定带来的副作用全在它之后。
+- **世界状态不进 checkpoint**。已执行的工具调用按顺序记录，恢复时在一份新的数据库
+  上重放重建。测试里由一个从没见过该会话的进程回复审批，第三个进程读回订单，
+  状态正确。
 
-只报最终成功率而不报触发率，等于把 oracle 的功劳算在自己头上。
-配套还要拆开 **漏放**（该触发未触发，安全事故）和
-**过度打扰**（不该触发却触发，体验问题）——绝不能合成一个数字。
+`store/` 是**独立的审计库**，绝不碰 tau2 的世界状态 DB——评分靠世界状态哈希比对，
+多写一个字节全部任务判负。写入按 (session, seq) 幂等，内容不同则拒绝覆盖。
 
 ---
 
-## src/policygate/viz/ — Streamlit
+## 6. 设计稿里有、最终没实现的
 
-用 Streamlit 不用 React：纯 Python，两三天能出可用版本，天然适合
-「读 trace JSON → 渲染」。别重造 Langfuse 已有的通用 trace 视图，
-只做 harness 特有和合规特有的部分。
+如实列出，因为 `HarnessConfig` 里仍留着它们的开关：
 
-```
-viz/
-├── app.py
-└── pages/
-    ├── 1_paired_trace.py    # 配对对比（主视图）：按分歧点对齐 + 代表性统计
-    ├── 2_single_trace.py    # 单条轨迹逐步查看
-    ├── 3_ablation.py        # 消融矩阵热力图
-    └── 4_failures.py        # 失败分类分布与迁移
-```
+| 模块 | 状态 | 理由 |
+|---|---|---|
+| `idempotency.py` | 未实现，开关保留 | W1 在 90 条 simulation 里观测到 **0 次重复写调用**，这个域上它没有可作用的事件，消融行按构造为 0 |
+| `retry.py`（失败分类重试） | 未实现 | 同上：需要先有证据表明分类能改变结果 |
+| `compensation.py`（写失败回滚） | 未实现 | retail 的写操作由环境原子执行，没有观测到部分失败 |
+| `guards.py`（循环守卫） | 未实现 | W1 零次非正常终止，没有可守的事件 |
+| `context.py` | 合并进 `gating.py` | 按状态裁剪 schema 与门控共用同一份「状态 → 工具集」，拆成两个文件会让它们有各自的真相 |
+| `eval/taxonomy.py`（失败八分类） | 未实现 | 分类器本身会成为一个需要验证的部件；改用「哪条规则触发了」这种可直接计数的证据 |
+| `eval/ablation.py` | 合并进 `runner.py` | 消融就是 plan 里的一组臂，不需要单独的编排层 |
 
-**配对对比是主视图，单条轨迹是它的降级版。** 单条轨迹回答「这次发生了什么」，
-配对回答「我的模块改变了什么」——后者才是消融证据。
-
-每条轨迹旁边必须挂「代表性」元数据（这个模式在 k 轮里出现几次、
-同类任务效应方向一致的有几个）。没有它，界面就是个 cherry-picking 机器。
-
----
-
-## configs/ 与 experiments/
-
-```
-configs/
-├── baseline.yaml            # 全部 harness 模块关闭
-├── full.yaml                # 全部开启
-├── ablation/
-│   ├── no_gating.yaml
-│   ├── no_idempotency.yaml
-│   └── ...                  # 每个模块一个
-└── models/
-    ├── cheap.yaml           # 迭代用：便宜模型 + 小子集
-    └── final.yaml           # 出报告用：全量
-
-experiments/
-└── 2026-09-15_gating_ablation/
-    ├── config.yaml          # 产生这批结果的完整配置（含 seed）
-    ├── raw/                 # 原始轨迹 JSON
-    ├── metrics.parquet
-    └── figures/
-```
-
-**结果和产生它的配置必须存在一起。** 这是可复现性的最低要求，
-也是你 README 方法论章节的素材来源。
-
----
-
-## tests/ scripts/ docs/
-
-```
-tests/
-├── test_harness/       # 纯单元测试，不调 LLM，跑得飞快
-├── test_adapters/
-└── test_eval/          # pass^k 计算、失败分类器的正确性
-
-scripts/
-├── setup_db.sh
-├── run_baseline.sh
-└── check_no_framework_deps.py   # CI 用：确保 harness/ 不 import 框架
-
-docs/
-├── architecture.md     # 本文件
-├── methodology.md      # 实验设计：假设、控制变量、样本量、置信区间
-└── figures/            # 架构图源文件
-```
-
-`docs/methodology.md` 和 CI 里那个依赖检查脚本，是这个项目区别于
-普通 agent 作品集的两个具体标志。绝大多数 agent 项目的 README 里没有
-「方法」这一节——有这一节本身就是信号。
-
----
-
-## 构建顺序建议
-
-先写 `types.py` 和 `config.py`（定契约），
-再写 `harness/` 各模块 + 单元测试（不需要 LLM，快），
-再写 `adapters/tau2_agent.py` 接通，
-然后 `eval/` 跑批，
-最后 `viz/` 和 `service/`。
-
-viz 放在消融之后是刻意的：先有数据再做可视化，才知道该突出什么。
-反过来容易做出一堆没数据填的空壳。
+**开关留着而实现没写，是刻意的**：`HarnessConfig.full()` 不会打开它们，
+所以不会出现「臂声称启用了某机制，而那个机制什么都没做」的错标行。
+一旦某个域真的出现对应的失败，补上实现，消融表里自然多出一行。
