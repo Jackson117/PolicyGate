@@ -251,6 +251,24 @@ class TestValidationRefusals:
         assert denied[-1].decision.rule == "validation.refused"
         assert "#12345" in denied[-1].decision.reason
 
+    def test_the_refusal_the_model_reads_says_what_to_do_next(self, env, retail_db, monkeypatch):
+        """W4 v4. The fields are useless unless they reach the model's context:
+        v3's refusals stated only the reason, and refused writes were followed by
+        a reference action 30% of the time against 48% for environment errors."""
+        llm = ScriptedLLM()
+        agent = build(env, retail_db, llm, monkeypatch)
+        state = verified_scoped(agent, llm)
+        llm.responses.extend([cancels("#12345"), says("Which order did you mean?")])
+        agent.generate_next_message(UserMessage(role="user", content="cancel it"), state)
+
+        refusal = next(m for m in reversed(state.messages)
+                       if getattr(m, "role", None) == "tool" and m.error)
+        assert "Refused by the policy harness" in refusal.content
+        assert "Next: " in refusal.content
+        # The remedy names the orders this session did retrieve, not just the bad id.
+        assert "#W5490111" in refusal.content.split("Next: ")[1]
+        assert state.chain.records[-1].decision.remedy  # and the chain records it
+
     @staticmethod
     def look_up(agent, llm, state, call_id: str, order_json: str) -> None:
         llm.responses.append(

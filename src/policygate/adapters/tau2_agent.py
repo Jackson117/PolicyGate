@@ -297,6 +297,11 @@ class HarnessAgent(HalfDuplexAgent[HarnessAgentState]):
                         outcome=DecisionOutcome.DENY,
                         rule="validation.refused",
                         reason="; ".join(f.message for f in checks.failures),
+                        # On the decision too, so the audit chain records what the
+                        # model was told to do, not only what it was refused for.
+                        remedy="; ".join(
+                            dict.fromkeys(f.remedy for f in checks.failures if f.remedy)
+                        ) or None,
                     )
                 elif self._needs_approval(call, state):
                     decision = self._seek_approval(call, decision, state)
@@ -353,14 +358,25 @@ class HarnessAgent(HalfDuplexAgent[HarnessAgentState]):
         verdicts: Sequence[tuple[Tau2ToolCall, Decision, CheckResult]],
         state: HarnessAgentState,
     ) -> None:
-        """Return each refusal to the model in the shape it already understands."""
-        for call, decision, _ in verdicts:
-            text = (
-                f"Refused by the policy harness ({decision.rule}). {decision.reason} "
-                "This action did not run."
-                if decision.outcome is not DecisionOutcome.ALLOW
-                else "Not run: another call in the same turn was refused."
-            )
+        """Return each refusal to the model in the shape it already understands.
+
+        The remedy is a separate sentence rather than part of the reason: W4 v3
+        refusals said only why, and were followed by a reference action 30% of
+        the time against 48% for errors the environment itself returned.
+        """
+        for call, decision, checks in verdicts:
+            if decision.outcome is DecisionOutcome.ALLOW:
+                text = "Not run: another call in the same turn was refused."
+            else:
+                remedies = [f.remedy for f in checks.failures if f.remedy]
+                if decision.remedy:
+                    remedies.insert(0, decision.remedy)
+                text = (
+                    f"Refused by the policy harness ({decision.rule}). {decision.reason} "
+                    "This action did not run."
+                )
+                if remedies:
+                    text += " Next: " + "; ".join(dict.fromkeys(remedies)) + "."
             state.messages.append(
                 ToolMessage(
                     id=call.id,

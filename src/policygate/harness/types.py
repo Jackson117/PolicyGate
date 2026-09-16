@@ -138,6 +138,14 @@ class Decision(BaseModel):
     outcome: DecisionOutcome
     rule: str
     reason: str
+    remedy: str | None = None
+    """The next action that would be accepted, in the imperative.
+
+    Split from ``reason`` because they answer different questions and W4 v3
+    showed the model only acted on one of them: after a refusal that said why
+    but not what to do, 30% of refused writes were followed by a reference
+    action, against 48% after an error the environment itself returned."""
+
     clauses: tuple[ClauseRef, ...] = ()
 
     @property
@@ -179,6 +187,8 @@ class CheckFailure(BaseModel):
     field: str | None = None
     observed: Any = None
     expected: Any = None
+    remedy: str | None = None
+    """What to do instead, in the imperative. See :attr:`Decision.remedy`."""
 
 
 class CheckResult(BaseModel):

@@ -444,3 +444,49 @@ class TestRepeatedObservations:
         with pytest.raises(ValueError, match="not another observation"):
             PENDING.observed_again(DELIVERED)
 
+
+class TestEveryFailureSaysWhatToDoNext:
+    """W4 v4: the refusal has to carry an action, not only a diagnosis."""
+
+    CASES = [
+        ("missing argument", "return_delivered_order_items",
+         {"order_id": "#W5490111"}),
+        ("unknown argument", "return_delivered_order_items",
+         {"order_id": "#W5490111", "item_ids": ["x"], "payment_method_id": "p",
+          "refund_to": "paypal"}),
+        ("non-canonical value", "modify_user_address", {"state": "New York"}),
+        ("non-string value", "modify_user_address", {"state": 42}),
+        ("unknown referent", "return_delivered_order_items",
+         {"order_id": "#12345", "item_ids": ["x"], "payment_method_id": "p"}),
+        ("another user's order", "return_delivered_order_items",
+         {"order_id": "#W8000002", "item_ids": ["x"], "payment_method_id": "p"}),
+        ("status never retrieved", "return_delivered_order_items",
+         {"order_id": "#W9000001", "item_ids": ["x"], "payment_method_id": "p"}),
+        ("precondition unmet", "cancel_pending_order", {"order_id": "#W5490111"}),
+    ]
+
+    @pytest.mark.parametrize("name,tool,args", CASES)
+    def test_every_failure_carries_a_remedy(self, name, tool, args):
+        result = validator().review(call(tool, **args), subject=USER, world=WORLD)
+        assert not result.passed, name
+        for failure in result.failures:
+            assert failure.remedy, f"{name}: {failure.code} has no remedy"
+            assert failure.remedy != failure.message, name
+
+    def test_the_remedy_names_the_value_to_send(self):
+        result = validator().review(call("modify_user_address", state="New York"))
+        assert "'NY'" in result.failures[0].remedy
+
+    def test_the_remedy_for_an_unknown_order_points_at_what_is_known(self):
+        result = validator().review(
+            call("cancel_pending_order", order_id="#12345"), subject=USER, world=WORLD
+        )
+        remedy = next(f.remedy for f in result.failures
+                      if f.code is FailureCode.REFERENT_UNKNOWN)
+        assert PENDING.id in remedy
+
+    def test_a_passing_call_has_nothing_to_remedy(self):
+        assert validator().review(
+            call("cancel_pending_order", order_id=PENDING.id), subject=USER, world=WORLD
+        ).failures == ()
+

@@ -255,6 +255,7 @@ class Validator:
                     field=missing,
                     message=f"{call.name!r} requires {missing!r}",
                     expected=missing,
+                    remedy=f"propose {call.name!r} again with {missing!r} filled in",
                 )
             )
         for unknown in sorted(supplied - schema.known):
@@ -265,6 +266,10 @@ class Validator:
                     message=f"{call.name!r} has no argument {unknown!r}",
                     observed=unknown,
                     expected=sorted(schema.known),
+                    remedy=(
+                        f"propose {call.name!r} again without {unknown!r}; it accepts "
+                        f"{sorted(schema.known)}"
+                    ),
                 )
             )
         return CheckResult.failed(*failures) if failures else CheckResult.ok()
@@ -291,6 +296,10 @@ class Validator:
                         ),
                         observed=value,
                         expected=sorted(constraint.allowed),
+                        remedy=(
+                            f"propose the call again with {constraint.field} set to one of "
+                            f"{sorted(constraint.allowed)}"
+                        ),
                     )
                 )
                 continue
@@ -307,6 +316,12 @@ class Validator:
                     message=f"{constraint.field}={value!r} is not the stored form; {hint}",
                     observed=value,
                     expected=canonical or sorted(constraint.allowed),
+                    remedy=(
+                        f"propose {call.name!r} again with {constraint.field}={canonical!r}"
+                        if canonical
+                        else f"propose {call.name!r} again with {constraint.field} set to one "
+                             f"of {sorted(constraint.allowed)}"
+                    ),
                 )
             )
         return CheckResult.failed(*failures) if failures else CheckResult.ok()
@@ -334,6 +349,7 @@ class Validator:
                     field=field,
                     message=f"{call.name!r} needs {field!r} to say which object it acts on",
                     expected=field,
+                    remedy=f"propose {call.name!r} again with {field!r} naming the object",
                 )
             )
 
@@ -348,6 +364,12 @@ class Validator:
                     ),
                     observed=referent,
                     expected=sorted(world),
+                    remedy=(
+                        f"look {referent!r} up first, or act on one of {sorted(world)} if the "
+                        "user meant one of those"
+                        if world
+                        else f"look {referent!r} up first, then propose {call.name!r} again"
+                    ),
                 )
             )
 
@@ -369,6 +391,10 @@ class Validator:
                     ),
                     observed=owner,
                     expected=subject,
+                    remedy=(
+                        "tell the user this order is on another account and cannot be changed "
+                        "here; act only on their own objects"
+                    ),
                 )
             )
         return CheckResult.ok()
@@ -393,6 +419,10 @@ class Validator:
                         ),
                         observed=None,
                         expected=sorted(pre.allowed_values),
+                        remedy=(
+                            f"retrieve {target.id!r} to see its {pre.attribute}, then propose "
+                            f"{call.name!r} again if it is {sorted(pre.allowed_values)}"
+                        ),
                     )
                 )
                 continue
@@ -406,6 +436,10 @@ class Validator:
                     ),
                     observed=observed,
                     expected=sorted(pre.allowed_values),
+                    remedy=(
+                        f"{call.name!r} cannot run while {target.id!r} is {observed!r}; tell "
+                        "the user why, and offer an action its current state allows"
+                    ),
                 )
             )
         return CheckResult.failed(*failures) if failures else CheckResult.ok()

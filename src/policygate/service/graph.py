@@ -97,10 +97,12 @@ class _Step:
 
 
 def _refusal(call_id: str, decision: Decision) -> dict[str, Any]:
+    content = (f"Refused by the policy harness ({decision.rule}). {decision.reason} "
+               "This action did not run.")
+    if decision.remedy:
+        content += f" Next: {decision.remedy}."
     return dump(ToolMessage(
-        id=call_id, role="tool", requestor="assistant", error=True,
-        content=(f"Refused by the policy harness ({decision.rule}). {decision.reason} "
-                 "This action did not run."),
+        id=call_id, role="tool", requestor="assistant", error=True, content=content,
     ))
 
 
@@ -144,8 +146,13 @@ def build_graph(runtime: RetailRuntime, checkpointer: Any):
                     call, subject=step.tracker.facts.user_id, world=step.world
                 )
                 if not checks.passed:
-                    decision = Decision(outcome=DecisionOutcome.DENY, rule="validation.refused",
-                                        reason="; ".join(f.message for f in checks.failures))
+                    decision = Decision(
+                        outcome=DecisionOutcome.DENY, rule="validation.refused",
+                        reason="; ".join(f.message for f in checks.failures),
+                        remedy="; ".join(
+                            dict.fromkeys(f.remedy for f in checks.failures if f.remedy)
+                        ) or None,
+                    )
             step.chain.append(
                 AuditEvent.TOOL_PROPOSED if decision.allowed else AuditEvent.TOOL_DENIED,
                 tool_call=call, decision=decision,

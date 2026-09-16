@@ -169,12 +169,14 @@ class ToolGate:
             return self._deny(
                 GateRule.UNKNOWN_TOOL,
                 f"{call.name!r} is not a tool in this domain",
+                remedy="choose a tool from the ones offered in this turn",
             )
 
         if call.name in self.visible_tools(state):
             return self._allow(GateRule.ALLOWED, f"{call.name!r} is available in state {state}")
 
-        return self._deny(*self._why_not(spec, state))
+        rule, reason, remedy = self._why_not(spec, state)
+        return self._deny(rule, reason, remedy=remedy)
 
     def review_turn(self, calls: Iterable[ToolCall], state: SessionState) -> TurnReview:
         """Judge everything proposed in one turn.
@@ -195,6 +197,10 @@ class ToolGate:
             decision = self._deny(
                 GateRule.ONE_CALL_PER_TURN,
                 f"{len(calls)} tool calls proposed in one turn; policy allows at most one",
+                remedy=(
+                    f"propose only {calls[0].name!r} now; its result comes back before the "
+                    "next call, and the others can follow one per turn"
+                ),
             )
             return TurnReview(decisions=(decision,) * len(calls), allowed_calls=())
 
@@ -204,29 +210,48 @@ class ToolGate:
 
     # --- internals ---------------------------------------------------------
 
-    def _why_not(self, spec: ToolSpec, state: SessionState) -> tuple[GateRule, str]:
-        """Attribute a refusal to a specific rule, not a generic 'not visible'."""
+    def _why_not(self, spec: ToolSpec, state: SessionState) -> tuple[GateRule, str, str]:
+        """Attribute a refusal to a specific rule, not a generic 'not visible'.
+
+        Returns the rule, why it fired, and what to do next -- the last of these
+        separately, because W4 v3 found the model stops acting when told only why.
+        """
         if state is SessionState.TRANSFERRED:
             return (
                 GateRule.SESSION_ENDED,
                 "the conversation has been handed to a human agent",
+                "make no further tool calls; the human agent takes over from here",
             )
         if state is SessionState.PENDING_APPROVAL:
             return (
                 GateRule.FROZEN_PENDING_APPROVAL,
                 "a write is awaiting approval; the session is paused until it resolves",
+                "wait for the approval decision before proposing anything else",
             )
         if state is SessionState.UNVERIFIED:
+            lookups = sorted(
+                name for name, s in self._tools.items() if s.role is ToolRole.IDENTITY_LOOKUP
+            )
             return (
                 GateRule.IDENTITY_FIRST,
                 f"{spec.name!r} needs an authenticated subject; "
                 "resolve the user's identity with a lookup first",
+                (
+                    f"call one of {lookups} to establish who the user is, then propose "
+                    f"{spec.name!r} again"
+                    if lookups
+                    else f"establish the user's identity, then propose {spec.name!r} again"
+                ),
             )
         if spec.kind is ToolKind.WRITE:
             return (
                 GateRule.WRITE_REQUIRES_SCOPE,
                 f"{spec.name!r} writes to the database but exactly one target is not yet "
                 "in scope; narrow to a single object before proposing a write",
+                (
+                    "retrieve the one object this should act on -- ask the user which it is "
+                    f"if that is unclear -- and then propose {spec.name!r} again"
+                ),
             )
         raise AssertionError(  # pragma: no cover - defensive
             f"{spec.name!r} is not visible in {state} and no rule explains why"
@@ -240,10 +265,11 @@ class ToolGate:
             clauses=self._clauses.get(rule, ()),
         )
 
-    def _deny(self, rule: GateRule, reason: str) -> Decision:
+    def _deny(self, rule: GateRule, reason: str, *, remedy: str | None = None) -> Decision:
         return Decision(
             outcome=DecisionOutcome.DENY,
             rule=rule.value,
             reason=reason,
+            remedy=remedy,
             clauses=self._clauses.get(rule, ()),
         )

@@ -215,3 +215,39 @@ class TestVisibilityAndEnforcementAgree:
             for spec in RETAIL_CATALOGUE:
                 decision = g.review_call(call(spec.name), state)
                 assert decision.allowed is (spec.name in visible)
+
+
+class TestEveryRefusalSaysWhatToDoNext:
+    """W4 v4: a refusal that says only why was followed by a reference action 30%
+    of the time, against 48% for errors the environment itself returned."""
+
+    def test_each_refusing_rule_carries_a_remedy(self):
+        g = gate()
+        refusals = [
+            g.review_call(call("no_such_tool"), SessionState.VERIFIED),
+            g.review_call(call("get_user_details"), SessionState.UNVERIFIED),
+            g.review_call(call("cancel_pending_order"), SessionState.VERIFIED),
+            g.review_call(call("get_user_details"), SessionState.TRANSFERRED),
+            g.review_call(call("get_user_details"), SessionState.PENDING_APPROVAL),
+            g.review_turn([call("get_user_details"), call("get_order_details")],
+                          SessionState.SCOPED).decisions[0],
+        ]
+        assert {d.outcome for d in refusals} == {DecisionOutcome.DENY}
+        assert len({d.rule for d in refusals}) == len(refusals)  # one per rule, no overlap
+        for d in refusals:
+            assert d.remedy, d.rule
+            assert d.remedy[0].islower(), d.remedy  # a clause, appended after the reason
+
+    def test_the_identity_remedy_names_the_lookups_that_exist(self):
+        d = gate().review_call(call("get_user_details"), SessionState.UNVERIFIED)
+        assert "find_user_id_by_email" in d.remedy
+
+    def test_the_parallel_remedy_names_the_call_to_keep(self):
+        review = gate().review_turn(
+            [call("get_order_details"), call("get_product_details")], SessionState.SCOPED
+        )
+        assert "get_order_details" in review.decisions[0].remedy
+
+    def test_an_allowed_call_has_no_remedy(self):
+        assert gate().review_call(call("get_user_details"), SessionState.VERIFIED).remedy is None
+
