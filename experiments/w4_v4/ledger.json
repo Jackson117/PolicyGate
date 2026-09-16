@@ -1,0 +1,90 @@
+{
+  "plan_fingerprint": "48a64ae64fb4c2ff0c0ea7b26cdd3203a719c00ff82772e7413d2f32bc153f4a",
+  "complete": {
+    "baseline/chunk_000": {
+      "key": "baseline/chunk_000",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.1675384,
+      "user_cost": 0.2947028
+    },
+    "full/chunk_000": {
+      "key": "full/chunk_000",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.5289016,
+      "user_cost": 0.3018204
+    },
+    "baseline/chunk_001": {
+      "key": "baseline/chunk_001",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.0991271999999999,
+      "user_cost": 0.29999
+    },
+    "full/chunk_001": {
+      "key": "full/chunk_001",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.3903747999999998,
+      "user_cost": 0.30500679999999997
+    },
+    "baseline/chunk_002": {
+      "key": "baseline/chunk_002",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.0092324,
+      "user_cost": 0.2513376
+    },
+    "full/chunk_002": {
+      "key": "full/chunk_002",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.25196,
+      "user_cost": 0.2702752
+    },
+    "baseline/chunk_003": {
+      "key": "baseline/chunk_003",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.1771916,
+      "user_cost": 0.27660199999999996
+    },
+    "full/chunk_003": {
+      "key": "full/chunk_003",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.23684,
+      "user_cost": 0.2805988
+    },
+    "baseline/chunk_004": {
+      "key": "baseline/chunk_004",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.1235747999999999,
+      "user_cost": 0.28434159999999997
+    },
+    "full/chunk_004": {
+      "key": "full/chunk_004",
+      "simulations": 100,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 1.3026404,
+      "user_cost": 0.27146159999999997
+    },
+    "baseline/chunk_005": {
+      "key": "baseline/chunk_005",
+      "simulations": 70,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.8160576,
+      "user_cost": 0.211272
+    },
+    "full/chunk_005": {
+      "key": "full/chunk_005",
+      "simulations": 70,
+      "infrastructure_errors": 0,
+      "agent_llm_cost": 0.9114175999999999,
+      "user_cost": 0.2009
+    }
+  },
+  "incomplete": {}
+}
