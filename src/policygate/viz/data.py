@@ -409,3 +409,179 @@ def harness_events_by_call(session: SessionRecord | None) -> dict[str, list[dict
             }
         )
     return grouped
+
+
+# --- the audit chain, and where to look in it -----------------------------
+
+
+class ChainRow(BaseModel):
+    """One audit record, flattened for display with its link to the previous one."""
+
+    model_config = ConfigDict(frozen=True)
+
+    seq: int
+    event: str
+    tool: str | None
+    arguments: Mapping[str, Any] | None
+    rule: str | None
+    reason: str | None
+    remedy: str | None
+    world_diff: Mapping[str, Any] | None
+    prev_hash: str
+    record_hash: str
+    linked: bool
+    """Whether this record's prev_hash is the previous record's hash."""
+
+
+class Anchor(BaseModel):
+    """A place in one session worth jumping to, and the evidence that it is one.
+
+    tau2 scores a run by hashing the world state at the end, so no record is
+    marked "this is where it went wrong" and none can be. Every anchor here is
+    an observable: an action the reference trajectory contains and this session
+    never executed, a write it executed that the reference does not contain, the
+    first refusal, the handover, a break in the chain.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    seq: int | None
+    """Where to jump. None when the evidence is an absence -- nothing ran."""
+
+    kind: str
+    label: str
+    detail: str
+
+
+def chain_rows(session: SessionRecord | None) -> list[ChainRow]:
+    """The chain as rows, each saying whether it links to the one before it."""
+    if session is None:
+        return []
+    rows, expected = [], None
+    for record in session.records:
+        linked = expected is None or record.prev_hash == expected
+        rows.append(
+            ChainRow(
+                seq=record.seq,
+                event=record.event.value,
+                tool=record.tool_call.name if record.tool_call else None,
+                arguments=dict(record.tool_call.arguments) if record.tool_call else None,
+                rule=record.decision.rule if record.decision else None,
+                reason=record.decision.reason if record.decision else None,
+                remedy=record.decision.remedy if record.decision else None,
+                world_diff=dict(record.world_diff) if record.world_diff else None,
+                prev_hash=record.prev_hash,
+                record_hash=record.record_hash,
+                linked=linked,
+            )
+        )
+        expected = record.record_hash
+    return rows
+
+
+def chain_integrity(session: SessionRecord | None) -> tuple[bool, list[str]]:
+    """Re-verify the chain from the records themselves, not from a stored flag."""
+    from policygate.harness.audit import verify_records
+
+    if session is None:
+        return False, ["no session record was written for this simulation"]
+    result = verify_records(session.records)
+    # Positions, not the records' own seq: a tampered record's seq is itself one
+    # of the things under suspicion (harness/audit.py, ChainBreak.index).
+    return result.intact, [f"record #{b.index} ({b.kind.value}): {b.detail}"
+                           for b in result.breaks]
+
+
+def anchors(session: SessionRecord | None, reference: Sequence[Any] = ()) -> list[Anchor]:
+    """Where to look first in a session, with the evidence for each place.
+
+    ``reference`` is the task's evaluation actions. Ordered by seq so the list
+    reads like the session: absences, which have no seq, come last.
+    """
+    if session is None:
+        return []
+    records = list(session.records)
+    found: list[Anchor] = []
+
+    intact, breaks = chain_integrity(session)
+    for text in breaks:
+        found.append(Anchor(seq=None, kind="chain_break", label="chain break", detail=text))
+
+    executed = [r for r in records if r.event is AuditEvent.TOOL_EXECUTED and r.tool_call]
+    denied = [r for r in records if r.event is AuditEvent.TOOL_DENIED and r.decision]
+
+    if denied:
+        first = denied[0]
+        recovered = any(r.seq > first.seq for r in executed)
+        found.append(Anchor(
+            seq=first.seq, kind="first_refusal",
+            label=f"first refusal · {first.decision.rule}",
+            detail=(f"{first.decision.reason} "
+                    + ("Something ran after it." if recovered else "Nothing ran after it.")),
+        ))
+
+    wanted = {(a.name, _referent(a.arguments)) for a in reference}
+    ran = {(r.tool_call.name, _referent(r.tool_call.arguments)): r for r in executed}
+
+    for name, referent in sorted(wanted - set(ran), key=lambda k: (k[0], k[1] or "")):
+        attempted = [r for r in denied
+                     if r.tool_call and (r.tool_call.name, _referent(r.tool_call.arguments))
+                     == (name, referent)]
+        found.append(Anchor(
+            seq=attempted[0].seq if attempted else None,
+            kind="missing_reference_action",
+            label=f"never ran · {name}" + (f" on {referent}" if referent else ""),
+            detail=("proposed and refused here" if attempted else "never proposed"),
+        ))
+
+    for key, record in sorted(ran.items(), key=lambda kv: kv[1].seq):
+        if key not in wanted and record.tool_call:
+            found.append(Anchor(
+                seq=record.seq, kind="unreferenced_write",
+                label=f"ran, not in the reference · {key[0]}"
+                      + (f" on {key[1]}" if key[1] else ""),
+                detail="the reference trajectory does not contain this action",
+            ))
+
+    transfer = next((r for r in records if r.tool_call
+                     and r.tool_call.name == "transfer_to_human_agents"), None)
+    if transfer is not None:
+        found.append(Anchor(seq=transfer.seq, kind="handover",
+                            label="handed to a human agent",
+                            detail="the session ended here"))
+
+    return sorted(found, key=lambda a: (a.seq is None, a.seq or 0))
+
+
+def _referent(arguments: Mapping[str, Any] | None) -> str | None:
+    """The object an action names, when it names one. Retail calls it order_id."""
+    value = (arguments or {}).get("order_id")
+    return value if isinstance(value, str) else None
+
+
+def message_index_for(simulation: Any, session: SessionRecord | None, seq: int) -> int:
+    """Which trajectory message a chain record belongs to.
+
+    Records and messages are not the same sequence -- a refused proposal has a
+    record and no message at all -- so the two are joined on the tool call's id.
+    A record whose call never reached the environment resolves to the message
+    after the last one that did, which is where the model was when it proposed.
+    """
+    if session is None:
+        return 0
+    message_of: dict[str, int] = {}
+    for index, message in enumerate(simulation.messages or []):
+        for tool_call in getattr(message, "tool_calls", None) or []:
+            message_of.setdefault(tool_call.id, index)
+
+    last_seen = 0
+    for record in session.records:
+        call_id = record.tool_call.id if record.tool_call else None
+        if call_id is not None and call_id in message_of:
+            if record.seq == seq:
+                return message_of[call_id]
+            if record.seq < seq:
+                last_seen = message_of[call_id]
+        elif record.seq == seq:
+            return min(last_seen + 1, max(0, len(simulation.messages or []) - 1))
+    return last_seen
