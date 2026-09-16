@@ -1,0 +1,445 @@
+{
+  "fingerprint": "737f7e15846ce27de8d1f95ebd367746d5481a031dbc1e5297243565f07ab1ac",
+  "run_id": "a16c6a220db84afea0d0fc178a37e51e",
+  "provenance": {
+    "started_at": "2026-09-15T09:52:34.098834+00:00",
+    "commit": "4b053aec85933a42a7dfdca1f93ddc89c3f65229",
+    "tau2_commit": "a2c024725189473d2d7cea3a5cfdbcc67478e41f",
+    "code": "aba903db0e9685b5b2eb715c767a700235964d99944384cf5e471ca33d93d23d",
+    "code_dirty": false
+  },
+  "plan": {
+    "name": "w4",
+    "domain": "retail",
+    "task_ids": [
+      "103",
+      "99",
+      "95",
+      "3",
+      "44",
+      "57",
+      "72",
+      "22",
+      "30",
+      "25",
+      "106",
+      "91",
+      "23",
+      "73",
+      "59",
+      "16",
+      "58",
+      "29",
+      "2",
+      "54",
+      "8",
+      "37",
+      "98",
+      "69",
+      "89",
+      "43",
+      "83",
+      "52",
+      "87",
+      "104",
+      "10",
+      "24",
+      "47",
+      "112",
+      "78",
+      "13",
+      "50",
+      "21",
+      "41",
+      "82",
+      "88",
+      "35",
+      "19",
+      "6",
+      "107",
+      "92",
+      "75",
+      "48",
+      "109",
+      "28",
+      "34",
+      "110",
+      "85",
+      "67",
+      "15",
+      "14",
+      "96",
+      "81",
+      "4",
+      "93",
+      "80",
+      "20",
+      "46",
+      "31",
+      "84",
+      "63",
+      "0",
+      "105",
+      "11",
+      "1",
+      "76",
+      "7",
+      "113",
+      "66",
+      "56",
+      "102",
+      "70",
+      "26",
+      "40",
+      "55",
+      "101",
+      "86",
+      "71",
+      "60",
+      "42",
+      "9",
+      "94",
+      "39",
+      "18",
+      "77",
+      "90",
+      "68",
+      "32",
+      "79",
+      "12",
+      "111",
+      "36",
+      "17",
+      "64",
+      "27",
+      "74",
+      "45",
+      "61",
+      "38",
+      "100",
+      "51",
+      "62",
+      "65",
+      "33",
+      "5",
+      "53",
+      "97",
+      "49",
+      "108"
+    ],
+    "arms": [
+      {
+        "config": {
+          "name": "baseline",
+          "gating_enabled": false,
+          "context_pruning_enabled": false,
+          "schema_check_enabled": false,
+          "value_canonicalization_enabled": false,
+          "referent_check_enabled": false,
+          "precondition_check_enabled": false,
+          "parallel_call_block_enabled": false,
+          "idempotency_enabled": false,
+          "classified_retry_enabled": false,
+          "compensation_enabled": false,
+          "approval_gate_enabled": false,
+          "approval": {
+            "policy": "auto_approve",
+            "noise_rate": 0.0,
+            "require_for_kinds": [
+              "write"
+            ]
+          },
+          "audit_enabled": false,
+          "loop_guards": {
+            "max_tool_calls": 40,
+            "max_wall_clock_seconds": 600.0,
+            "max_repeated_actions": 3
+          },
+          "loop_guards_enabled": false,
+          "seed": 0
+        },
+        "trials": 5,
+        "phase": "headline"
+      },
+      {
+        "config": {
+          "name": "full",
+          "gating_enabled": true,
+          "context_pruning_enabled": true,
+          "schema_check_enabled": true,
+          "value_canonicalization_enabled": true,
+          "referent_check_enabled": true,
+          "precondition_check_enabled": true,
+          "parallel_call_block_enabled": true,
+          "idempotency_enabled": false,
+          "classified_retry_enabled": false,
+          "compensation_enabled": false,
+          "approval_gate_enabled": false,
+          "approval": {
+            "policy": "auto_approve",
+            "noise_rate": 0.0,
+            "require_for_kinds": [
+              "write"
+            ]
+          },
+          "audit_enabled": true,
+          "loop_guards": {
+            "max_tool_calls": 40,
+            "max_wall_clock_seconds": 600.0,
+            "max_repeated_actions": 3
+          },
+          "loop_guards_enabled": false,
+          "seed": 0
+        },
+        "trials": 5,
+        "phase": "headline"
+      },
+      {
+        "config": {
+          "name": "only_gating_enabled",
+          "gating_enabled": true,
+          "context_pruning_enabled": false,
+          "schema_check_enabled": false,
+          "value_canonicalization_enabled": false,
+          "referent_check_enabled": false,
+          "precondition_check_enabled": false,
+          "parallel_call_block_enabled": false,
+          "idempotency_enabled": false,
+          "classified_retry_enabled": false,
+          "compensation_enabled": false,
+          "approval_gate_enabled": false,
+          "approval": {
+            "policy": "auto_approve",
+            "noise_rate": 0.0,
+            "require_for_kinds": [
+              "write"
+            ]
+          },
+          "audit_enabled": true,
+          "loop_guards": {
+            "max_tool_calls": 40,
+            "max_wall_clock_seconds": 600.0,
+            "max_repeated_actions": 3
+          },
+          "loop_guards_enabled": false,
+          "seed": 0
+        },
+        "trials": 1,
+        "phase": "attribution"
+      },
+      {
+        "config": {
+          "name": "only_context_pruning_enabled",
+          "gating_enabled": false,
+          "context_pruning_enabled": true,
+          "schema_check_enabled": false,
+          "value_canonicalization_enabled": false,
+          "referent_check_enabled": false,
+          "precondition_check_enabled": false,
+          "parallel_call_block_enabled": false,
+          "idempotency_enabled": false,
+          "classified_retry_enabled": false,
+          "compensation_enabled": false,
+          "approval_gate_enabled": false,
+          "approval": {
+            "policy": "auto_approve",
+            "noise_rate": 0.0,
+            "require_for_kinds": [
+              "write"
+            ]
+          },
+          "audit_enabled": true,
+          "loop_guards": {
+            "max_tool_calls": 40,
+            "max_wall_clock_seconds": 600.0,
+            "max_repeated_actions": 3
+          },
+          "loop_guards_enabled": false,
+          "seed": 0
+        },
+        "trials": 1,
+        "phase": "attribution"
+      },
+      {
+        "config": {
+          "name": "only_schema_check_enabled",
+          "gating_enabled": false,
+          "context_pruning_enabled": false,
+          "schema_check_enabled": true,
+          "value_canonicalization_enabled": false,
+          "referent_check_enabled": false,
+          "precondition_check_enabled": false,
+          "parallel_call_block_enabled": false,
+          "idempotency_enabled": false,
+          "classified_retry_enabled": false,
+          "compensation_enabled": false,
+          "approval_gate_enabled": false,
+          "approval": {
+            "policy": "auto_approve",
+            "noise_rate": 0.0,
+            "require_for_kinds": [
+              "write"
+            ]
+          },
+          "audit_enabled": true,
+          "loop_guards": {
+            "max_tool_calls": 40,
+            "max_wall_clock_seconds": 600.0,
+            "max_repeated_actions": 3
+          },
+          "loop_guards_enabled": false,
+          "seed": 0
+        },
+        "trials": 1,
+        "phase": "attribution"
+      },
+      {
+        "config": {
+          "name": "only_value_canonicalization_enabled",
+          "gating_enabled": false,
+          "context_pruning_enabled": false,
+          "schema_check_enabled": false,
+          "value_canonicalization_enabled": true,
+          "referent_check_enabled": false,
+          "precondition_check_enabled": false,
+          "parallel_call_block_enabled": false,
+          "idempotency_enabled": false,
+          "classified_retry_enabled": false,
+          "compensation_enabled": false,
+          "approval_gate_enabled": false,
+          "approval": {
+            "policy": "auto_approve",
+            "noise_rate": 0.0,
+            "require_for_kinds": [
+              "write"
+            ]
+          },
+          "audit_enabled": true,
+          "loop_guards": {
+            "max_tool_calls": 40,
+            "max_wall_clock_seconds": 600.0,
+            "max_repeated_actions": 3
+          },
+          "loop_guards_enabled": false,
+          "seed": 0
+        },
+        "trials": 1,
+        "phase": "attribution"
+      },
+      {
+        "config": {
+          "name": "only_referent_check_enabled",
+          "gating_enabled": false,
+          "context_pruning_enabled": false,
+          "schema_check_enabled": false,
+          "value_canonicalization_enabled": false,
+          "referent_check_enabled": true,
+          "precondition_check_enabled": false,
+          "parallel_call_block_enabled": false,
+          "idempotency_enabled": false,
+          "classified_retry_enabled": false,
+          "compensation_enabled": false,
+          "approval_gate_enabled": false,
+          "approval": {
+            "policy": "auto_approve",
+            "noise_rate": 0.0,
+            "require_for_kinds": [
+              "write"
+            ]
+          },
+          "audit_enabled": true,
+          "loop_guards": {
+            "max_tool_calls": 40,
+            "max_wall_clock_seconds": 600.0,
+            "max_repeated_actions": 3
+          },
+          "loop_guards_enabled": false,
+          "seed": 0
+        },
+        "trials": 1,
+        "phase": "attribution"
+      },
+      {
+        "config": {
+          "name": "only_precondition_check_enabled",
+          "gating_enabled": false,
+          "context_pruning_enabled": false,
+          "schema_check_enabled": false,
+          "value_canonicalization_enabled": false,
+          "referent_check_enabled": false,
+          "precondition_check_enabled": true,
+          "parallel_call_block_enabled": false,
+          "idempotency_enabled": false,
+          "classified_retry_enabled": false,
+          "compensation_enabled": false,
+          "approval_gate_enabled": false,
+          "approval": {
+            "policy": "auto_approve",
+            "noise_rate": 0.0,
+            "require_for_kinds": [
+              "write"
+            ]
+          },
+          "audit_enabled": true,
+          "loop_guards": {
+            "max_tool_calls": 40,
+            "max_wall_clock_seconds": 600.0,
+            "max_repeated_actions": 3
+          },
+          "loop_guards_enabled": false,
+          "seed": 0
+        },
+        "trials": 1,
+        "phase": "attribution"
+      },
+      {
+        "config": {
+          "name": "only_parallel_call_block_enabled",
+          "gating_enabled": false,
+          "context_pruning_enabled": false,
+          "schema_check_enabled": false,
+          "value_canonicalization_enabled": false,
+          "referent_check_enabled": false,
+          "precondition_check_enabled": false,
+          "parallel_call_block_enabled": true,
+          "idempotency_enabled": false,
+          "classified_retry_enabled": false,
+          "compensation_enabled": false,
+          "approval_gate_enabled": false,
+          "approval": {
+            "policy": "auto_approve",
+            "noise_rate": 0.0,
+            "require_for_kinds": [
+              "write"
+            ]
+          },
+          "audit_enabled": true,
+          "loop_guards": {
+            "max_tool_calls": 40,
+            "max_wall_clock_seconds": 600.0,
+            "max_repeated_actions": 3
+          },
+          "loop_guards_enabled": false,
+          "seed": 0
+        },
+        "trials": 1,
+        "phase": "attribution"
+      }
+    ],
+    "agent_llm": "openai/gpt-4.1-mini",
+    "user_llm": "openai/gpt-4.1-mini",
+    "judge_llm": "openai/gpt-4.1",
+    "llm_args_agent": {
+      "temperature": 0.0
+    },
+    "llm_args_user": {
+      "temperature": 0.0
+    },
+    "seed": 42,
+    "max_steps": 100,
+    "max_internal_attempts": 3,
+    "chunk_size": 20,
+    "hallucination_retries": 0,
+    "enforce_communication_protocol": false
+  }
+}
