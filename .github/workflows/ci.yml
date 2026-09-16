@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  # third_party/tau2-bench is a pinned checkout, git-ignored rather than vendored
+  # (third_party/PIN.md). CI clones the same commit; bumping it here without
+  # bumping PIN.md is the mistake this duplication is meant to make visible.
+  TAU2_COMMIT: a2c024725189473d2d7cea3a5cfdbcc67478e41f
+
+jobs:
+  harness:
+    # The harness imports no agent framework, so it needs neither tau2 nor its
+    # data: this job proves that property by running without them.
+    name: harness (no framework, no benchmark)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install 3.12
+      - name: Install the harness's dependencies only
+        # Not `uv sync`: [tool.uv.sources] points tau2 at third_party/, so the
+        # project resolves it whatever extras are selected. Installing the
+        # dependencies by hand is what makes this job's claim true -- these
+        # tests see no agent framework at all, not even an unused one.
+        run: |
+          uv venv --python 3.12
+          uv pip install pydantic deepdiff pytest ruff "sqlalchemy>=2.0"
+      - name: harness/ imports only the stdlib, pydantic and deepdiff
+        run: PYTHONPATH=src .venv/bin/python scripts/check_no_framework_deps.py
+      - run: .venv/bin/python -m ruff check src tests scripts
+      - name: Unit tests that need no benchmark
+        run: PYTHONPATH=src .venv/bin/python -m pytest tests/test_harness tests/test_store -q
+
+  full:
+    name: full suite (with pinned tau2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install 3.12
+      - name: Clone tau2-bench at the pinned commit
+        run: |
+          git clone --filter=blob:none https://github.com/sierra-research/tau2-bench.git \
+            third_party/tau2-bench
+          git -C third_party/tau2-bench checkout "$TAU2_COMMIT"
+      - name: The pin matches PIN.md
+        run: |
+          grep -q "$TAU2_COMMIT" third_party/PIN.md
+      - run: uv sync --extra bench --extra store --extra service --extra viz --extra dev
+      - name: Full suite
+        # No API keys: every test either runs the harness directly or scripts the
+        # LLM. A test that reaches a provider would fail here, which is the point.
+        run: uv run pytest -q

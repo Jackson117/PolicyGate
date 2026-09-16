@@ -1,0 +1,21 @@
+# Keep the build context small: the tau2 checkout alone is 1.6 GB on disk, and
+# the deployment needs its code plus one domain's data, not the benchmark's.
+.git
+.venv
+.venv-*
+.pytest_cache
+.ruff_cache
+**/__pycache__
+.env
+experiments
+docs
+tests
+list
+*.log
+
+third_party/tau2-bench/.git
+third_party/tau2-bench/data/**
+# The service runs retail tools through the tau2 environment, so its domain data
+# comes back in. Everything else under data/ (other domains, the knowledge
+# corpus, simulation checkpoints) stays out.
+!third_party/tau2-bench/data/tau2/domains/retail/**

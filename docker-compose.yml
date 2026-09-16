@@ -1,0 +1,61 @@
+# The deployment: approval service, dashboard, and the audit database.
+#
+#   docker compose up --build            # service on :8000, dashboard on :8501
+#   docker compose run --rm service pytest  # not available: tests are not in the image
+#
+# The audit store is its own Postgres and never tau2's world state. CLAUDE.md
+# constraint #3: scoring compares the world-state database by hash, so one extra
+# byte written there fails every task.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: policygate
+      POSTGRES_PASSWORD: policygate
+      POSTGRES_DB: audit
+    volumes:
+      - audit:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U policygate -d audit"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    # Published so the host can inspect the chain; drop this to keep it internal.
+    ports:
+      - "5432:5432"
+
+  service:
+    build:
+      context: .
+      target: service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Two stores, deliberately separate: the audit chain and the LangGraph
+      # checkpoints. Both live in the audit database, neither touches tau2's.
+      POLICYGATE_AUDIT_URL: postgresql+psycopg://policygate:policygate@postgres:5432/audit
+      POLICYGATE_CHECKPOINT_URL: postgresql://policygate:policygate@postgres:5432/audit
+      # The agent's model. Keys come from the host environment, never the image.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY in .env or the environment}
+      OPENAI_API_BASE: ${OPENAI_API_BASE:-https://api.openai.com/v1}
+    ports:
+      - "8000:8000"
+
+  dashboard:
+    build:
+      context: .
+      target: dashboard
+    environment:
+      POLICYGATE_RUN_ROOT: /runs
+      POLICYGATE_RUN_DIR: /runs/w4_v4
+    volumes:
+      # Read-only: the dashboard reads what the runner wrote on the host and
+      # must not be able to alter a result it is displaying.
+      - ./experiments:/runs:ro
+    ports:
+      - "8501:8501"
+
+volumes:
+  audit:

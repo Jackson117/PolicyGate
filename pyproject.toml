@@ -53,6 +53,12 @@ packages = ["src/policygate"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Two kinds of script are kept as written rather than maintained, so they are
+# not linted: the *_learn_* files are modules rewritten from memory before
+# reading the real one (reformatting them would edit the evidence), and the w1_*
+# files are the one-off analysis scripts that produced the W1 numbers, since
+# superseded by src/policygate/eval/. Everything still in use is linted.
+extend-exclude = ["scripts/*_learn_*.py", "scripts/w1_*.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
