@@ -31,6 +31,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--num-tasks", type=int, default=None, help="default: all tasks in the domain")
     p.add_argument("--chunk-size", type=int, default=20)
     p.add_argument("--max-concurrency", type=int, default=4)
+    p.add_argument(
+        "--headline-only",
+        action="store_true",
+        help="baseline and full only, no attribution arms (v4 tests one hypothesis)",
+    )
     p.add_argument("--dry-run", action="store_true")
     return p.parse_args()
 
@@ -60,6 +65,12 @@ def main() -> int:
         attribution_trials=args.attribution_trials,
         chunk_size=args.chunk_size,
     )
+    if args.headline_only:
+        # A different arm list is a different plan, and its fingerprint says so:
+        # v4's run directory can never be confused with v3's ablation.
+        plan = plan.model_copy(
+            update={"arms": tuple(a for a in plan.arms if a.phase == "headline")}
+        )
 
     print(f"plan {plan.fingerprint()[:12]}  ->  {args.out}")
     chunks = len(plan.schedule())
