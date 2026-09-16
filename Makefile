@@ -1,7 +1,7 @@
 UV ?= uv
 PY := .venv/bin/python
 
-.PHONY: sync test lint baseline analyze
+.PHONY: sync test lint baseline analyze viz ablate ablate-watched purity
 
 sync:
 	$(UV) sync --extra bench --extra dev
@@ -19,3 +19,23 @@ baseline:
 
 analyze:
 	$(PY) scripts/w1_analyze.py $(RESULTS)
+
+# --- W4 and after -----------------------------------------------------------
+
+# The dashboard over experiments/. POLICYGATE_RUN_DIR picks the run it opens.
+viz:
+	$(UV) run streamlit run src/policygate/viz/app.py --server.port 8501
+
+# One ablation run. Costs money: --dry-run first, and mind --budget.
+OUT ?= experiments/run
+BUDGET ?= 30
+ablate:
+	$(UV) run python scripts/w4_run.py --budget $(BUDGET) --out $(OUT)
+
+# The same, restarted whenever it stops making progress (see the script).
+ablate-watched:
+	bash scripts/w4_watchdog.sh $(OUT) $(BUDGET)
+
+# harness/ imports no agent framework. CI runs this too.
+purity:
+	$(UV) run python scripts/check_no_framework_deps.py
