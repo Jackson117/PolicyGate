@@ -20,12 +20,12 @@ import json
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
 from tau2.data_model.message import ToolCall as Tau2ToolCall
 from tau2.data_model.tasks import Task
 from tau2.environment.toolkit import ToolKitBase, ToolType, get_tool_types
 
 from policygate.harness.approval import ExpectedAction, GroundTruth
+from policygate.harness.session import ExtractedFacts
 from policygate.harness.types import ClauseRef, ToolCall, ToolKind, ToolRole, ToolSpec
 from policygate.harness.validation import (
     ArgumentSchema,
@@ -82,20 +82,6 @@ def tool_specs(
             role = ToolRole.ESCALATION
         specs.append(ToolSpec(name=name, kind=_KIND_BY_TOOL_TYPE[tool_type], role=role))
     return tuple(specs)
-
-
-class ExtractedFacts(BaseModel):
-    """What one tool result established.
-
-    ``scope_targets`` is ``None`` when the result says nothing about what the
-    session is acting on, which is different from saying it acts on nothing.
-    """
-
-    model_config = ConfigDict(frozen=True)
-
-    user_id: str | None = None
-    scope_targets: tuple[str, ...] | None = None
-    objects: tuple[KnownObject, ...] = ()
 
 
 def _parse(content: str | None) -> Any:

@@ -50,25 +50,15 @@ from policygate.adapters.tool_mapping import ExtractedFacts, to_harness_call
 from policygate.harness.approval import ApprovalDecider, auto_approve
 from policygate.harness.audit import AuditChain
 from policygate.harness.config import HarnessConfig
-from policygate.harness.gating import GateRule, ToolGate
+from policygate.harness.gating import ToolGate
+from policygate.harness.session import HarnessSession, Verdict, all_allowed
 from policygate.harness.state import (
     RETAIL_PROFILE,
     DomainStateProfile,
     SessionTracker,
-    StateError,
 )
-from policygate.harness.types import (
-    ApprovalRequest,
-    ApprovalStatus,
-    AuditEvent,
-    CheckResult,
-    Decision,
-    DecisionOutcome,
-    ToolCall,
-    ToolKind,
-    ToolRole,
-)
-from policygate.harness.validation import DomainConstraints, KnownObject, Validator, observe
+from policygate.harness.types import ToolCall
+from policygate.harness.validation import DomainConstraints, KnownObject, Validator
 
 AGENT_INSTRUCTION = """
 You are a customer service agent that helps the user according to the <policy> provided below.
@@ -98,29 +88,47 @@ FactExtractor = Callable[..., ExtractedFacts]
 class HarnessAgentState:
     """Conversation plus everything the harness has established.
 
-    A plain object rather than a pydantic model: it holds the tracker and the
-    audit chain, which are stateful and are not meant to round-trip through
-    serialisation.
+    A plain object rather than a pydantic model: the harness session holds the
+    tracker and the audit chain, which are stateful and are not meant to
+    round-trip through serialisation. ``tracker``, ``chain``, ``world`` and
+    ``pending_execution`` read through to it.
     """
 
     def __init__(
         self,
         system_messages: list[SystemMessage],
         messages: list[APICompatibleMessage],
-        tracker: SessionTracker,
-        chain: AuditChain,
+        session: HarnessSession,
     ) -> None:
         self.system_messages = system_messages
         self.messages = messages
-        self.tracker = tracker
-        self.chain = chain
-        self.world: dict[str, KnownObject] = {}
-        self.pending_execution: ToolCall | None = None
+        self.session = session
+
+    @property
+    def tracker(self) -> SessionTracker:
+        return self.session.tracker
+
+    @property
+    def chain(self) -> AuditChain:
+        return self.session.chain
+
+    @property
+    def world(self) -> dict[str, KnownObject]:
+        return self.session.world
+
+    @property
+    def pending_execution(self) -> ToolCall | None:
         """The call handed to the environment, awaiting its result."""
+        return self.session.pending_execution
 
 
 class HarnessAgent(HalfDuplexAgent[HarnessAgentState]):
-    """tau2's agent contract, with the harness in the proposal path."""
+    """tau2's agent contract, with the harness in the proposal path.
+
+    The protocol itself lives in :class:`~policygate.harness.session.HarnessSession`;
+    this class calls the model and translates between tau2's messages and the
+    harness's types.
+    """
 
     def __init__(
         self,
@@ -163,8 +171,15 @@ class HarnessAgent(HalfDuplexAgent[HarnessAgentState]):
         return HarnessAgentState(
             system_messages=[SystemMessage(role="system", content=self.system_prompt)],
             messages=list(message_history or []),
-            tracker=SessionTracker(profile=self.profile),
-            chain=AuditChain(self.session_id, self.clock, self.config),
+            session=HarnessSession(
+                gate=self.gate,
+                validator=self.validator,
+                config=self.config,
+                approve=self.approve,
+                session_id=self.session_id,
+                clock=self.clock,
+                profile=self.profile,
+            ),
         )
 
     # --- tau2 entry point --------------------------------------------------
@@ -181,9 +196,10 @@ class HarnessAgent(HalfDuplexAgent[HarnessAgentState]):
             if not response.tool_calls:
                 return response, state  # a message to the user: nothing to gate
 
-            verdicts = self._review(response.tool_calls, state)
-            if all(d.outcome is DecisionOutcome.ALLOW for _, d, _ in verdicts):
-                self._note_handoff(response, state)
+            calls = [to_harness_call(c) for c in response.tool_calls]
+            verdicts = state.session.review(calls)
+            if all_allowed(verdicts):
+                state.session.note_handoff(calls)
                 return response, state
 
             self._feed_back_refusals(verdicts, state)
@@ -208,32 +224,13 @@ class HarnessAgent(HalfDuplexAgent[HarnessAgentState]):
             if isinstance(message, ToolMessage):
                 tool_messages = [message]
 
-        for tool_message in tool_messages:
-            self._absorb_result(tool_message, state)
-
-    def _absorb_result(self, result: ToolMessage, state: HarnessAgentState) -> None:
-        executed = state.pending_execution
-        if executed is not None and executed.id == result.id:
-            state.pending_execution = None
-            if not result.error:
-                self._record_execution(executed, state)
-
-        name = self._tool_name_for(result, state)
-        if name is None:
-            return
-        facts = self.extract_facts(name, result.content, error=result.error)
-
-        observe(state.world, facts.objects)
-        try:
-            if facts.user_id:
-                state.tracker.record_identity(facts.user_id)
-            if facts.scope_targets is not None:
-                state.tracker.record_targets(facts.scope_targets)
-        except StateError:
-            # The session is bound to another subject, or already transferred.
-            # Refusing to update is the correct outcome; the gate will refuse
-            # whatever is proposed next for the same reason.
-            pass
+        for result in tool_messages:
+            name = self._tool_name_for(result, state)
+            facts = (
+                None if name is None
+                else self.extract_facts(name, result.content, error=result.error)
+            )
+            state.session.absorb_result(result.id, error=result.error, facts=facts)
 
     def _tool_name_for(self, result: ToolMessage, state: HarnessAgentState) -> str | None:
         for message in reversed(state.messages):
@@ -241,14 +238,6 @@ class HarnessAgent(HalfDuplexAgent[HarnessAgentState]):
                 if call.id == result.id:
                     return call.name
         return None
-
-    def _record_execution(self, call: ToolCall, state: HarnessAgentState) -> None:
-        if self.config.approval_gate_enabled:
-            try:
-                state.tracker.record_execution(call)
-            except StateError:
-                pass  # nothing was authorised; the chain still records what ran
-        state.chain.append(AuditEvent.TOOL_EXECUTED, tool_call=call, decision=None)
 
     # --- proposing ---------------------------------------------------------
 
@@ -262,124 +251,21 @@ class HarnessAgent(HalfDuplexAgent[HarnessAgentState]):
         )
 
     def _offered_tools(self, state: HarnessAgentState) -> list[Tool]:
-        """The schemas the model is shown. Prevention, as opposed to enforcement.
-
-        Without context pruning the model sees everything and the gate only
-        refuses afterwards, which is a different mechanism with a different cost
-        and is switched separately. With pruning but no gating, the model is
-        shown only what fits the state, yet a call to a hidden tool is not
-        refused -- prevention with no enforcement behind it.
-        """
-        if not self.config.context_pruning_enabled:
-            return list(self._tools_by_name.values())
-        visible = self.gate.state_tools(state.tracker.state)
-        return [t for name, t in self._tools_by_name.items() if name in visible]
-
-    # --- reviewing ---------------------------------------------------------
-
-    def _review(
-        self, calls: Sequence[Tau2ToolCall], state: HarnessAgentState
-    ) -> list[tuple[Tau2ToolCall, Decision, CheckResult]]:
-        harness_calls = [to_harness_call(c) for c in calls]
-        turn = self.gate.review_turn(harness_calls, state.tracker.state)
-
-        verdicts: list[tuple[Tau2ToolCall, Decision, CheckResult]] = []
-        for original, call, decision in zip(calls, harness_calls, turn.decisions, strict=True):
-            checks = CheckResult.ok()
-            if decision.outcome is DecisionOutcome.ALLOW:
-                checks = self.validator.review(
-                    call,
-                    subject=state.tracker.facts.user_id,
-                    world=state.world,
-                )
-                if not checks.passed:
-                    decision = Decision(
-                        outcome=DecisionOutcome.DENY,
-                        rule="validation.refused",
-                        reason="; ".join(f.message for f in checks.failures),
-                        # On the decision too, so the audit chain records what the
-                        # model was told to do, not only what it was refused for.
-                        remedy="; ".join(
-                            dict.fromkeys(f.remedy for f in checks.failures if f.remedy)
-                        ) or None,
-                    )
-                elif self._needs_approval(call, state):
-                    decision = self._seek_approval(call, decision, state)
-
-            state.chain.append(
-                AuditEvent.TOOL_PROPOSED if decision.outcome is DecisionOutcome.ALLOW
-                else AuditEvent.TOOL_DENIED,
-                tool_call=call,
-                decision=decision,
-            )
-            verdicts.append((original, decision, checks))
-        return verdicts
-
-    def _needs_approval(self, call: ToolCall, state: HarnessAgentState) -> bool:
-        if not self.config.approval_gate_enabled:
-            return False
-        spec = self.gate.catalogue.get(call.name)
-        return spec is not None and spec.kind in self.config.approval.require_for_kinds
-
-    def _seek_approval(
-        self, call: ToolCall, allowed: Decision, state: HarnessAgentState
-    ) -> Decision:
-        """Pause the write, ask, and record the two numbers separately.
-
-        Whether the gate fired is the harness's contribution; whether the answer
-        was yes belongs to the approval policy. Reporting only the end-to-end
-        score would credit the harness with the decider's work, so both events
-        go into the chain.
-        """
-        request = ApprovalRequest(
-            request_id=str(uuid.uuid4()),
-            tool_call=call,
-            reason=f"{call.name} changes stored state",
-        )
-        state.tracker.open_approval(request.request_id, call)
-        state.chain.append(AuditEvent.APPROVAL_REQUESTED, tool_call=call, decision=allowed)
-
-        answer = self.approve(request)
-        state.tracker.resolve_approval(answer.status is ApprovalStatus.APPROVED)
-        state.chain.append(AuditEvent.APPROVAL_RESOLVED, tool_call=call, approval=answer)
-
-        if answer.status is ApprovalStatus.APPROVED:
-            return allowed
-        return Decision(
-            outcome=DecisionOutcome.DENY,
-            rule="approval.rejected",
-            reason=answer.reason or "the approval gate did not authorise this action",
-        )
+        """The schemas the model is shown; see :meth:`HarnessSession.offered`."""
+        return [self._tools_by_name[n] for n in state.session.offered(self._tools_by_name)]
 
     # --- refusals and handoff ----------------------------------------------
 
-    def _feed_back_refusals(
-        self,
-        verdicts: Sequence[tuple[Tau2ToolCall, Decision, CheckResult]],
-        state: HarnessAgentState,
-    ) -> None:
+    def _feed_back_refusals(self, verdicts: Sequence[Verdict], state: HarnessAgentState) -> None:
         """Return each refusal to the model in the shape it already understands.
 
-        The remedy is a separate sentence rather than part of the reason: W4 v3
-        refusals said only why, and were followed by a reference action 30% of
-        the time against 48% for errors the environment itself returned.
+        A ``ToolMessage`` with ``error=True``, appended to the model's own history
+        and never routed to the user; see the module docstring.
         """
-        for call, decision, checks in verdicts:
-            if decision.outcome is DecisionOutcome.ALLOW:
-                text = "Not run: another call in the same turn was refused."
-            else:
-                remedies = [f.remedy for f in checks.failures if f.remedy]
-                if decision.remedy:
-                    remedies.insert(0, decision.remedy)
-                text = (
-                    f"Refused by the policy harness ({decision.rule}). {decision.reason} "
-                    "This action did not run."
-                )
-                if remedies:
-                    text += " Next: " + "; ".join(dict.fromkeys(remedies)) + "."
+        for call_id, text in HarnessSession.refusals(verdicts):
             state.messages.append(
                 ToolMessage(
-                    id=call.id,
+                    id=call_id,
                     role="tool",
                     content=text,
                     requestor="assistant",
@@ -387,38 +273,9 @@ class HarnessAgent(HalfDuplexAgent[HarnessAgentState]):
                 )
             )
 
-    def _note_handoff(self, response: AssistantMessage, state: HarnessAgentState) -> None:
-        """Remember the write we are about to hand to the environment."""
-        for call in response.tool_calls or []:
-            harness_call = to_harness_call(call)
-            spec = self.gate.catalogue.get(harness_call.name)
-            if spec is not None and spec.kind is ToolKind.WRITE:
-                state.pending_execution = harness_call
-
     def _escalate(self, state: HarnessAgentState) -> tuple[AssistantMessage, HarnessAgentState]:
-        """Hand to a human after the budget is spent.
-
-        Under its own rule, never mistaken for the model choosing to transfer --
-        that distinction is the difference between a failure the model avoided
-        and one the harness caught.
-        """
-        escalation = next(
-            (
-                name
-                for name, spec in self.gate.catalogue.items()
-                if spec.role is ToolRole.ESCALATION
-            ),
-            None,
-        )
-        decision = Decision(
-            outcome=DecisionOutcome.DENY,
-            rule=GateRule.ONE_CALL_PER_TURN.value.rsplit(".", 1)[0] + ".budget_exhausted",
-            reason=(
-                f"no acceptable action after {self.max_internal_attempts} attempts; "
-                "escalating to a human agent"
-            ),
-        )
-        state.chain.append(AuditEvent.TOOL_DENIED, decision=decision)
+        """Hand to a human after the budget is spent; see :meth:`HarnessSession.escalate`."""
+        escalation, decision = state.session.escalate(self.max_internal_attempts)
 
         if escalation is None:
             return AssistantMessage(

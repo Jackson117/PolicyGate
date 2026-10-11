@@ -26,6 +26,7 @@ flowchart TB
         GA --- VA[validation.py]
         VA --- AP[approval.py]
         AP --- AU[audit.py]
+        AU --- SE[session.py]
     end
     H -.-> STORE[(store/<br/>审计库 Postgres)]
     bench --> EV[eval/<br/>跑批与统计]
@@ -94,6 +95,10 @@ W4 两个 harness 缺陷都是靠「把每条拒绝与参考轨迹逐条比对�
 
 - `tau2_agent.py`：`HalfDuplexAgent` 的实现。提议 → 门控 → 校验 →（审批）→ 交付。
   被拒时在进程内重试，最多 `max_internal_attempts` 次，之后升级人工。
+  协议本身（吸收结果、审查提议、拒绝文案、升级）在 `harness/session.py` 的
+  `HarnessSession` 里，不依赖任何框架；adapter 只负责调用模型和 tau2 消息类型的转换。
+  自己调用模型的调用方（例如另一个项目里的 LangGraph 决策图）复用同一个
+  `HarnessSession`，而不是再写一份协议。
 - `tool_mapping.py`：工具目录（kind 与 role）、调用转换、结果 → 事实提取、
   从 db.json 与 policy.md 推出的域约束。
 
