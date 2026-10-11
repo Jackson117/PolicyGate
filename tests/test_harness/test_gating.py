@@ -251,3 +251,81 @@ class TestEveryRefusalSaysWhatToDoNext:
     def test_an_allowed_call_has_no_remedy(self):
         assert gate().review_call(call("get_user_details"), SessionState.VERIFIED).remedy is None
 
+
+
+# --- banking_knowledge: verification in two steps ------------------------------
+
+# Kinds as tau2 types them at the pinned commit: lookups READ, log_verification
+# WRITE (it writes the verification record), KB_search and get_current_time READ.
+BANKING_CATALOGUE = (
+    ToolSpec(name="get_user_information_by_email", kind=ToolKind.READ,
+             role=ToolRole.IDENTITY_LOOKUP),
+    ToolSpec(name="log_verification", kind=ToolKind.WRITE, role=ToolRole.IDENTITY_COMMIT),
+    ToolSpec(name="KB_search", kind=ToolKind.READ, role=ToolRole.SUBJECT_INDEPENDENT),
+    ToolSpec(name="get_current_time", kind=ToolKind.READ, role=ToolRole.SUBJECT_INDEPENDENT),
+    ToolSpec(name="get_credit_card_accounts_by_user", kind=ToolKind.READ),
+    ToolSpec(name="call_discoverable_agent_tool", kind=ToolKind.WRITE),
+    ToolSpec(name="transfer_to_human_agents", kind=ToolKind.GENERIC, role=ToolRole.ESCALATION),
+)
+
+
+def banking_gate(**overrides) -> ToolGate:
+    return ToolGate(BANKING_CATALOGUE, HarnessConfig.full(**overrides))
+
+
+class TestTwoStepVerification:
+    def test_before_verification_lookup_commit_knowledge_and_escalation_are_offered(self):
+        # The commit is a write, but it is the step that ends verification, so
+        # withholding it until after verification would deadlock the session.
+        assert banking_gate().visible_tools(SessionState.UNVERIFIED) == {
+            "get_user_information_by_email",
+            "log_verification",
+            "KB_search",
+            "get_current_time",
+            "transfer_to_human_agents",
+        }
+
+    def test_subject_data_stays_withheld_before_verification(self):
+        d = banking_gate().review_call(
+            call("get_credit_card_accounts_by_user"), SessionState.UNVERIFIED
+        )
+        assert d.rule == GateRule.IDENTITY_FIRST
+        assert "log_verification" in d.remedy  # the remedy names the step that is missing
+        assert "get_user_information_by_email" in d.remedy
+
+    @pytest.mark.parametrize("state", [SessionState.VERIFIED, SessionState.SCOPED])
+    def test_the_commit_is_withdrawn_once_identity_is_settled(self, state):
+        g = banking_gate()
+        assert "log_verification" not in g.visible_tools(state)
+        d = g.review_call(call("log_verification"), state)
+        assert d.rule == GateRule.IDENTITY_ALREADY_ESTABLISHED
+        assert d.remedy
+
+    def test_subject_independent_tools_stay_open_in_every_live_state(self):
+        g = banking_gate()
+        for state in (SessionState.UNVERIFIED, SessionState.VERIFIED, SessionState.SCOPED):
+            assert {"KB_search", "get_current_time"} <= g.visible_tools(state)
+
+    def test_a_subject_independent_write_keeps_the_scope_rule(self):
+        catalogue = (
+            ToolSpec(name="lookup", kind=ToolKind.READ, role=ToolRole.IDENTITY_LOOKUP),
+            ToolSpec(name="odd_write", kind=ToolKind.WRITE, role=ToolRole.SUBJECT_INDEPENDENT),
+        )
+        g = ToolGate(catalogue, HarnessConfig.full())
+        assert "odd_write" not in g.visible_tools(SessionState.UNVERIFIED)
+        assert "odd_write" not in g.visible_tools(SessionState.VERIFIED)
+
+    def test_visibility_and_enforcement_agree(self):
+        g = banking_gate()
+        for state in SessionState:
+            visible = g.visible_tools(state)
+            for spec in BANKING_CATALOGUE:
+                assert g.review_call(call(spec.name), state).allowed is (spec.name in visible)
+
+    def test_a_catalogue_without_the_new_roles_gates_as_before(self):
+        # The retail wording reaches the model, so it must not change by a byte.
+        d = gate().review_call(call("get_user_details"), SessionState.UNVERIFIED)
+        assert d.remedy == (
+            "call one of ['find_user_id_by_email', 'find_user_id_by_name_zip'] to establish "
+            "who the user is, then propose 'get_user_details' again"
+        )

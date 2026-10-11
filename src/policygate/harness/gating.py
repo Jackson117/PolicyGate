@@ -20,7 +20,12 @@ Rules are grounded in the domains' policy text, not invented. Retail: identity
 must be established by a lookup before anything else, at most one tool call per
 turn, transfer only when the request is out of scope. Airline carries the same
 skeleton without the authentication step -- see
-:class:`~policygate.harness.state.DomainStateProfile`.
+:class:`~policygate.harness.state.DomainStateProfile`. banking_knowledge
+verifies in two steps, a lookup and then a logged verification, and lets
+general questions through unauthenticated; the roles
+:attr:`~policygate.harness.types.ToolRole.IDENTITY_COMMIT` and
+:attr:`~policygate.harness.types.ToolRole.SUBJECT_INDEPENDENT` carry that, and a
+catalogue without them gates exactly as before.
 
 Pydantic and the standard library only. See CLAUDE.md constraint #2.
 """
@@ -63,6 +68,8 @@ class GateRule(StrEnum):
     FROZEN_PENDING_APPROVAL = "gating.frozen_pending_approval"
     SESSION_ENDED = "gating.session_ended"
     ONE_CALL_PER_TURN = "gating.one_call_per_turn"
+    IDENTITY_ALREADY_ESTABLISHED = "gating.identity_already_established"
+    """An identity commit proposed after the session is verified."""
 
 
 class TurnReview(BaseModel):
@@ -79,6 +86,12 @@ class TurnReview(BaseModel):
     @property
     def refused(self) -> bool:
         return any(d.outcome is not DecisionOutcome.ALLOW for d in self.decisions)
+
+
+_BEFORE_VERIFICATION = frozenset(
+    {ToolRole.IDENTITY_LOOKUP, ToolRole.IDENTITY_COMMIT, ToolRole.ESCALATION}
+)
+"""Roles legal before verification whatever their kind."""
 
 
 class ToolGate:
@@ -139,20 +152,31 @@ class ToolGate:
             # policy.md: identity must be established first, "even when the user
             # already provides the user id". Reads are withheld because they
             # return the profile and orders of a subject nobody has confirmed.
+            # Subject-independent tools are not about anyone, so they stay, unless
+            # they write.
             return frozenset(
                 name
                 for name, spec in self._tools.items()
-                if spec.role in (ToolRole.IDENTITY_LOOKUP, ToolRole.ESCALATION)
+                if spec.role in _BEFORE_VERIFICATION
+                or (spec.role is ToolRole.SUBJECT_INDEPENDENT and spec.kind is not ToolKind.WRITE)
             )
 
+        # From here on identity is settled, and committing it again would log a
+        # second verification nobody performed.
+        live = {
+            name: spec
+            for name, spec in self._tools.items()
+            if spec.role is not ToolRole.IDENTITY_COMMIT
+        }
+
         if state is SessionState.SCOPED:
-            return frozenset(self._tools)
+            return frozenset(live)
 
         if state is SessionState.VERIFIED:
             # VERIFIED: reads are open, but no unique write target exists yet, so a
             # write would have to guess its referent -- which is what task 14 was.
             return frozenset(
-                name for name, spec in self._tools.items() if spec.kind is not ToolKind.WRITE
+                name for name, spec in live.items() if spec.kind is not ToolKind.WRITE
             )
 
         raise AssertionError(f"{state} is not a legal SessionState")
@@ -232,16 +256,35 @@ class ToolGate:
             lookups = sorted(
                 name for name, s in self._tools.items() if s.role is ToolRole.IDENTITY_LOOKUP
             )
+            commits = sorted(
+                name for name, s in self._tools.items() if s.role is ToolRole.IDENTITY_COMMIT
+            )
+            remedy = (
+                f"call one of {lookups} to establish who the user is, then propose "
+                f"{spec.name!r} again"
+                if lookups
+                else f"establish the user's identity, then propose {spec.name!r} again"
+            )
+            if commits:
+                # Only domains that log verification as a separate step say so;
+                # the wording for every other domain is left exactly as it was.
+                find = f"look the user up with one of {lookups}, " if lookups else ""
+                remedy = (
+                    f"{find}verify their identity as the policy requires, record it with "
+                    f"one of {commits}, then propose {spec.name!r} again"
+                )
             return (
                 GateRule.IDENTITY_FIRST,
                 f"{spec.name!r} needs an authenticated subject; "
                 "resolve the user's identity with a lookup first",
-                (
-                    f"call one of {lookups} to establish who the user is, then propose "
-                    f"{spec.name!r} again"
-                    if lookups
-                    else f"establish the user's identity, then propose {spec.name!r} again"
-                ),
+                remedy,
+            )
+        if spec.role is ToolRole.IDENTITY_COMMIT:
+            return (
+                GateRule.IDENTITY_ALREADY_ESTABLISHED,
+                f"{spec.name!r} records a verification, and this session's identity is "
+                "already established",
+                "do not verify again; continue with the user's request",
             )
         if spec.kind is ToolKind.WRITE:
             return (

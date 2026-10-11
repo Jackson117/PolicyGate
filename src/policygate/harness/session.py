@@ -216,7 +216,11 @@ class HarnessSession:
         if not self.config.approval_gate_enabled:
             return False
         spec = self.gate.catalogue.get(call.name)
-        return spec is not None and spec.kind in self.config.approval.require_for_kinds
+        return (
+            spec is not None
+            and spec.kind in self.config.approval.require_for_kinds
+            and spec.role not in self.config.approval.exempt_roles
+        )
 
     def _seek_approval(self, call: ToolCall, allowed: Decision) -> Decision:
         """Pause the write, ask, and record the two numbers separately.

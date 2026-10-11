@@ -99,6 +99,11 @@ class DomainStateProfile(BaseModel):
     id". Airline: no -- its policy has no authentication step at all and says
     the agent obtains the user id from the user. With this off, UNVERIFIED is
     unreachable and a session starts VERIFIED.
+
+    Which tool's result establishes it is the adapter's call, made when it
+    extracts facts: retail's lookup result does; banking_knowledge's lookup only
+    finds a candidate, and identity is settled by the result of its verification
+    log (a tool with role ``IDENTITY_COMMIT``). The name predates that case.
     """
 
     single_subject_per_session: bool = True

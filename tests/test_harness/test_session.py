@@ -148,3 +148,50 @@ class TestEscalate:
         assert decision.rule == "gating.budget_exhausted"
         assert "after 3 attempts" in decision.reason
         assert events(s) == [AuditEvent.TOOL_DENIED]
+
+
+class TestIdentityCommit:
+    CATALOGUE = (
+        ToolSpec(name="get_user_information_by_email", kind=ToolKind.READ,
+                 role=ToolRole.IDENTITY_LOOKUP),
+        ToolSpec(name="log_verification", kind=ToolKind.WRITE, role=ToolRole.IDENTITY_COMMIT),
+        ToolSpec(name="transfer_to_human_agents", kind=ToolKind.GENERIC,
+                 role=ToolRole.ESCALATION),
+    )
+
+    def _session(self, approve, **approval) -> HarnessSession:
+        from policygate.harness.config import ApprovalConfig
+
+        config = HarnessConfig.full(
+            approval_gate_enabled=True, approval=ApprovalConfig(**approval)
+        )
+        return HarnessSession(
+            gate=ToolGate(self.CATALOGUE, config),
+            validator=Validator(DomainConstraints(), config),
+            config=config,
+            approve=approve,
+            session_id="s1",
+            clock=CLOCK,
+            profile=RETAIL_PROFILE,
+        )
+
+    def test_the_commit_does_not_pause_for_approval(self):
+        # Under auto_reject a gated commit would make verification impossible.
+        s = self._session(auto_reject)
+        commit = call("log_verification", id="v1", user_id="u1")
+        assert all_allowed(s.review([commit]))
+        assert AuditEvent.APPROVAL_REQUESTED not in events(s)
+
+    def test_the_commit_result_settles_identity_and_its_execution_is_recorded(self):
+        s = self._session(auto_reject)
+        commit = call("log_verification", id="v1", user_id="u1")
+        s.review([commit])
+        s.note_handoff([commit])
+        s.absorb_result("v1", error=False, facts=ExtractedFacts(user_id="u1"))
+        assert s.state is SessionState.VERIFIED
+        assert events(s)[-1] is AuditEvent.TOOL_EXECUTED
+
+    def test_the_exemption_can_be_switched_off(self):
+        s = self._session(auto_reject, exempt_roles=())
+        [verdict] = s.review([call("log_verification", user_id="u1")])
+        assert verdict.decision.rule == "approval.rejected"

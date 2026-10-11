@@ -51,10 +51,11 @@ flowchart TB
 | `types.py` | 共享模型：`ToolCall` / `Decision` / `CheckFailure` / `AuditRecord` / `ClauseRef` |
 | `config.py` | `HarnessConfig`：每个机制一个开关。消融的支点 |
 | `state.py` | 会话状态与合法转移：`UNVERIFIED → VERIFIED → SCOPED`，加上 `PENDING_APPROVAL` 与终态 `TRANSFERRED` |
-| `gating.py` | 状态 → 可见工具集；一轮一调用；每条拒绝归因到具体规则 |
+| `gating.py` | 状态 → 可见工具集；一轮一调用；每条拒绝归因到具体规则。两步验证的域（banking_knowledge：先查用户，再 `log_verification`）用 `IDENTITY_COMMIT` 与 `SUBJECT_INDEPENDENT` 两个 role 表达；目录里没有这两个 role 时，门控行为与之前逐字节相同 |
 | `validation.py` | 参数 schema、枚举值规范化、写操作对象的存在与归属、业务前置条件 |
 | `approval.py` | 审批闸门与四种决策器（`auto_approve` / `auto_reject` / `oracle` / `noisy_oracle`） |
 | `audit.py` | 哈希链：完整性、关联性、可验证顺序 |
+| `session.py` | `HarnessSession`：一次会话的逐轮协议（吸收结果、审查提议、拒绝文案、升级），不依赖任何框架 |
 
 ### 一次提议的处理路径
 

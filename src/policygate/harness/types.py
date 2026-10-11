@@ -81,6 +81,29 @@ class ToolRole(StrEnum):
     ESCALATION = "escalation"
     """Hands the conversation to a human. Always legal while the session is live."""
 
+    IDENTITY_COMMIT = "identity_commit"
+    """Records that the subject has been verified; identity is settled by its result.
+
+    For domains where a lookup only *finds* a candidate and verification is a
+    separate, logged step. banking_knowledge: the agent looks the user up, checks
+    two of four identity fields against what the user says, then must call
+    ``log_verification`` -- typed WRITE, because it writes the verification
+    record. Legal only before verification: it is the step that ends it.
+    Exempt from the approval gate by default; see
+    :attr:`~policygate.harness.config.ApprovalConfig.exempt_roles`.
+    """
+
+    SUBJECT_INDEPENDENT = "subject_independent"
+    """Touches no subject's data: knowledge-base search, the clock.
+
+    Legal in every live state, including before verification, unless it is a
+    write -- writes keep their scope rule whatever their role. banking_knowledge
+    answers general questions without authenticating anyone ("ONLY verify a
+    user's identity if you need to access or modify their customer
+    information"), and withholding its knowledge-base tools until then would
+    force a verification the policy does not ask for.
+    """
+
 
 class ToolSpec(BaseModel):
     """What the harness knows about a tool it may be asked to gate."""

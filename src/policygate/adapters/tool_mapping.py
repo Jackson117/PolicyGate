@@ -53,6 +53,8 @@ def tool_specs(
     *,
     identity_lookups: Iterable[str] = (),
     escalation: Iterable[str] = (),
+    identity_commits: Iterable[str] = (),
+    subject_independent: Iterable[str] = (),
 ) -> tuple[ToolSpec, ...]:
     """Build the gate's catalogue from a live toolkit.
 
@@ -60,26 +62,33 @@ def tool_specs(
     have to be declared, because neither distinction the gate needs is visible
     in the kind. In retail the identity lookups are typed READ exactly like
     ``get_user_details``, and ``transfer_to_human_agents`` is typed GENERIC
-    alongside ``calculate``.
+    alongside ``calculate``. Retail declares neither ``identity_commits`` nor
+    ``subject_independent``; see :class:`~policygate.harness.types.ToolRole` for
+    the domains that need them.
     """
-    identity = set(identity_lookups)
-    escalate = set(escalation)
-    overlap = identity & escalate
-    if overlap:
-        raise ValueError(f"tools declared both identity lookup and escalation: {sorted(overlap)}")
+    declared = {
+        ToolRole.IDENTITY_LOOKUP: set(identity_lookups),
+        ToolRole.ESCALATION: set(escalation),
+        ToolRole.IDENTITY_COMMIT: set(identity_commits),
+        ToolRole.SUBJECT_INDEPENDENT: set(subject_independent),
+    }
+    role_of: dict[str, ToolRole] = {}
+    for role, names in declared.items():
+        for name in names:
+            if name in role_of:
+                raise ValueError(
+                    f"tool {name!r} declared with two roles: {role_of[name]} and {role}"
+                )
+            role_of[name] = role
 
     types = get_tool_types(toolkit)
-    unknown = (identity | escalate) - set(types)
+    unknown = set(role_of) - set(types)
     if unknown:
         raise ValueError(f"declared roles for tools not in the toolkit: {sorted(unknown)}")
 
     specs = []
     for name, tool_type in sorted(types.items()):
-        role = ToolRole.ORDINARY
-        if name in identity:
-            role = ToolRole.IDENTITY_LOOKUP
-        elif name in escalate:
-            role = ToolRole.ESCALATION
+        role = role_of.get(name, ToolRole.ORDINARY)
         specs.append(ToolSpec(name=name, kind=_KIND_BY_TOOL_TYPE[tool_type], role=role))
     return tuple(specs)
 

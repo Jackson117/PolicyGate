@@ -77,8 +77,20 @@ class TestCatalogue:
         assert escalation.name == "transfer_to_human_agents"
         assert escalation.kind is ToolKind.GENERIC
 
+    def test_commit_and_subject_independent_roles_can_be_declared(self, toolkit):
+        catalogue = tool_specs(
+            toolkit,
+            identity_lookups=RETAIL_IDENTITY_LOOKUPS,
+            escalation=RETAIL_ESCALATION,
+            identity_commits=["get_user_details"],
+            subject_independent=["calculate"],
+        )
+        roles = {s.name: s.role for s in catalogue}
+        assert roles["get_user_details"] is ToolRole.IDENTITY_COMMIT
+        assert roles["calculate"] is ToolRole.SUBJECT_INDEPENDENT
+
     def test_a_tool_cannot_hold_two_roles(self, toolkit):
-        with pytest.raises(ValueError, match="both identity lookup and escalation"):
+        with pytest.raises(ValueError, match="declared with two roles"):
             tool_specs(
                 toolkit,
                 identity_lookups=["transfer_to_human_agents"],

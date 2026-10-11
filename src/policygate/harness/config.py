@@ -22,7 +22,7 @@ from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from policygate.harness.types import ToolKind
+from policygate.harness.types import ToolKind, ToolRole
 
 
 class LoopGuardConfig(BaseModel):
@@ -65,6 +65,16 @@ class ApprovalConfig(BaseModel):
 
     require_for_kinds: tuple[ToolKind, ...] = (ToolKind.WRITE,)
     """Which tool kinds pause for approval. Writes only, by default."""
+
+    exempt_roles: tuple[ToolRole, ...] = (ToolRole.IDENTITY_COMMIT,)
+    """Roles that never pause, whatever their kind.
+
+    An identity commit writes a verification record, but approving it means
+    nothing: the gate exists for consequential writes, and under ``auto_reject``
+    a gated commit would make verification -- and so every task behind it --
+    impossible for a reason that has nothing to do with the mechanism measured.
+    No retail or airline tool has this role, so their arms are unaffected.
+    """
 
     @model_validator(mode="after")
     def _noise_only_for_noisy_oracle(self) -> ApprovalConfig:
