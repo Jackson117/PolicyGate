@@ -1,6 +1,6 @@
 [project]
 name = "policygate"
-version = "0.2.0"
+version = "0.3.0"
 description = "Reliability and audit harness for policy-following trading agents, evaluated on tau2-bench"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
