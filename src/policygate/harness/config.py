@@ -26,20 +26,33 @@ from policygate.harness.types import ToolKind, ToolRole
 
 
 class LoopGuardConfig(BaseModel):
-    """Budgets that stop a session running away.
+    """Stop a session repeating itself.
 
-    W1 saw zero non-normal terminations in 90 simulations, so these are
-    insurance rather than a measured need. Defaults are set well clear of
-    observed behaviour (longest run: 13 tool calls) so that turning guards on
-    does not silently truncate normal work and get scored as a harness effect.
+    Implemented in 0.3.0 for banking_knowledge, where W1 of the policygate-rag
+    study found 34 of 90 golden-retrieval episodes hitting tau2's step cap,
+    every one a run of the same read call with the same arguments, none of
+    them a success, together 60% of the arm's cost. Retail never needed it: W1
+    here saw zero non-normal terminations in 90 simulations.
+
+    Only the repeated-action limit exists. A tool-call cap and a wall-clock cap
+    were declared here before any guard was written and are removed rather
+    than left claiming a mechanism nothing enforced: a wall-clock limit would
+    make outcomes depend on API latency, and a call cap close to legitimate
+    work (successful banking episodes reach 33 calls) would truncate
+    successes and score it as a harness effect.
     """
 
     model_config = ConfigDict(frozen=True)
 
-    max_tool_calls: int = Field(default=40, gt=0)
-    max_wall_clock_seconds: float = Field(default=600.0, gt=0)
     max_repeated_actions: int = Field(default=3, gt=0)
-    """How many times the same action fingerprint may be proposed before it is refused."""
+    """Consecutive identical calls (same name and arguments) allowed before the next
+    identical one is refused.
+
+    Consecutive among the calls handed to the environment: any different call
+    resets the count, and text turns in between do not. A repeat with no other
+    call between can only return what the last one did, so refusing it loses no
+    information; the refusal tells the model to use the result it has.
+    """
 
 
 class ApprovalPolicy(StrEnum):
@@ -168,6 +181,10 @@ class HarnessConfig(BaseModel):
 
     loop_guards: LoopGuardConfig = LoopGuardConfig()
     loop_guards_enabled: bool = False
+    """Refuse a call repeated beyond :attr:`LoopGuardConfig.max_repeated_actions`.
+
+    Off in :meth:`full`, so the arms policygate reported keep their definition.
+    """
 
     seed: int = 0
 
@@ -201,11 +218,13 @@ class HarnessConfig(BaseModel):
             "precondition_check_enabled": True,
             "parallel_call_block_enabled": True,
             "audit_enabled": True,
-            # Off until their modules exist: classified_retry, compensation and
-            # loop_guards have switches but no implementation, and idempotency is
-            # deferred by schedule. An arm whose recorded config claims a
-            # mechanism that did nothing is a mislabelled row. The approval gate
-            # is off by decision; see its field.
+            # Off until their modules exist: classified_retry and compensation
+            # have switches but no implementation, and idempotency is deferred
+            # by schedule. loop_guards exists since 0.3.0 but stays off here:
+            # turning it on would redefine the "full" arm the W4 results report.
+            # An arm whose recorded config claims a mechanism that did nothing
+            # is a mislabelled row. The approval gate is off by decision; see
+            # its field.
         }
         return cls(**(defaults | overrides))
 

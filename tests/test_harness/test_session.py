@@ -195,3 +195,55 @@ class TestIdentityCommit:
         s = self._session(auto_reject, exempt_roles=())
         [verdict] = s.review([call("log_verification", user_id="u1")])
         assert verdict.decision.rule == "approval.rejected"
+
+
+class TestLoopGuard:
+    def _session(self, enabled=True, limit=3):
+        from policygate.harness.config import LoopGuardConfig
+
+        return session(
+            gating_enabled=False,
+            loop_guards_enabled=enabled,
+            loop_guards=LoopGuardConfig(max_repeated_actions=limit),
+        )
+
+    def _run(self, s, c):
+        """Propose ``c``; hand it off if allowed. Returns the verdict."""
+        [verdict] = s.review([c])
+        if verdict.allowed:
+            s.note_handoff([c])
+        return verdict
+
+    def test_the_call_after_the_limit_is_refused_with_a_remedy(self):
+        s = self._session(limit=3)
+        lookup = call("get_order_details", order_id="#W1")
+        assert all(self._run(s, lookup).allowed for _ in range(3))
+        refused = self._run(s, lookup)
+        assert refused.decision.rule == "loop_guard.repeated_action"
+        assert refused.decision.remedy
+        assert events(s)[-1] is AuditEvent.TOOL_DENIED
+
+    def test_a_different_call_resets_the_count(self):
+        s = self._session(limit=2)
+        a, b = call("get_order_details", order_id="#W1"), call("get_order_details", order_id="#W2")
+        for c in (a, a, b, a, a):
+            assert self._run(s, c).allowed
+        assert not self._run(s, a).allowed
+
+    def test_different_arguments_are_a_different_call(self):
+        s = self._session(limit=1)
+        assert self._run(s, call("get_order_details", order_id="#W1")).allowed
+        assert self._run(s, call("get_order_details", order_id="#W2")).allowed
+
+    def test_a_refused_repeat_does_not_extend_the_count(self):
+        s = self._session(limit=1)
+        lookup = call("get_order_details", order_id="#W1")
+        assert self._run(s, lookup).allowed
+        assert not self._run(s, lookup).allowed
+        assert self._run(s, call("get_order_details", order_id="#W2")).allowed
+        assert self._run(s, lookup).allowed
+
+    def test_switched_off_it_never_refuses(self):
+        s = self._session(enabled=False, limit=1)
+        lookup = call("get_order_details", order_id="#W1")
+        assert all(self._run(s, lookup).allowed for _ in range(10))

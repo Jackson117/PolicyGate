@@ -110,6 +110,11 @@ class HarnessSession:
         self.world: dict[str, KnownObject] = {}
         self.pending_execution: ToolCall | None = None
         """The write handed to the environment, awaiting its result."""
+        self._last_handed_off: str | None = None
+        self._streak = 0
+        """How many times in a row the call fingerprinted ``_last_handed_off`` was
+        handed to the environment. Tracked whatever the switch says; only the
+        loop guard reads it."""
 
     @property
     def state(self) -> SessionState:
@@ -200,6 +205,20 @@ class HarnessSession:
                             dict.fromkeys(f.remedy for f in checks.failures if f.remedy)
                         ) or None,
                     )
+                elif self._repeats_too_often(call):
+                    limit = self.config.loop_guards.max_repeated_actions
+                    decision = Decision(
+                        outcome=DecisionOutcome.DENY,
+                        rule="loop_guard.repeated_action",
+                        reason=(
+                            f"{call.name!r} with these exact arguments has run {limit} times "
+                            "in a row; nothing has happened since that could change its result"
+                        ),
+                        remedy=(
+                            "use the result you already have, or take a different step: "
+                            "ask the user, call another tool, or answer"
+                        ),
+                    )
                 elif self._needs_approval(call):
                     decision = self._seek_approval(call, decision)
 
@@ -211,6 +230,14 @@ class HarnessSession:
             )
             verdicts.append(Verdict(call=call, decision=decision, checks=checks))
         return tuple(verdicts)
+
+    def _repeats_too_often(self, call: ToolCall) -> bool:
+        if not self.config.loop_guards_enabled:
+            return False
+        return (
+            call.fingerprint() == self._last_handed_off
+            and self._streak >= self.config.loop_guards.max_repeated_actions
+        )
 
     def _needs_approval(self, call: ToolCall) -> bool:
         if not self.config.approval_gate_enabled:
@@ -281,8 +308,17 @@ class HarnessSession:
         return out
 
     def note_handoff(self, calls: Sequence[ToolCall]) -> None:
-        """Remember the write about to be handed to the environment."""
+        """Remember what is about to be handed to the environment.
+
+        The write, for the approval bookkeeping when its result arrives; and
+        every call, for the loop guard's count of consecutive repeats.
+        """
         for call in calls:
+            fingerprint = call.fingerprint()
+            if fingerprint == self._last_handed_off:
+                self._streak += 1
+            else:
+                self._last_handed_off, self._streak = fingerprint, 1
             spec = self.gate.catalogue.get(call.name)
             if spec is not None and spec.kind is ToolKind.WRITE:
                 self.pending_execution = call

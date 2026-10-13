@@ -143,12 +143,14 @@ class TestApprovalConfig:
 
 
 class TestLoopGuards:
-    def test_budgets_must_be_positive(self):
+    def test_the_limit_must_be_positive(self):
         with pytest.raises(ValidationError):
-            LoopGuardConfig(max_tool_calls=0)
+            LoopGuardConfig(max_repeated_actions=0)
 
-    def test_defaults_sit_clear_of_observed_behaviour(self):
-        # Longest W1 run was 13 tool calls; a guard that trips on normal work
-        # would be scored as a harness effect.
-        assert LoopGuardConfig().max_tool_calls > 13
+    def test_only_the_implemented_limit_is_declared(self):
+        # A cap that nothing enforces would make a recorded config claim a
+        # mechanism that did nothing.
+        assert set(LoopGuardConfig.model_fields) == {"max_repeated_actions"}
 
+    def test_off_in_full_so_reported_arms_keep_their_definition(self):
+        assert HarnessConfig.full().loop_guards_enabled is False

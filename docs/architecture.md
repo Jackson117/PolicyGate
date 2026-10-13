@@ -55,7 +55,7 @@ flowchart TB
 | `validation.py` | 参数 schema、枚举值规范化、写操作对象的存在与归属、业务前置条件 |
 | `approval.py` | 审批闸门与四种决策器（`auto_approve` / `auto_reject` / `oracle` / `noisy_oracle`） |
 | `audit.py` | 哈希链：完整性、关联性、可验证顺序 |
-| `session.py` | `HarnessSession`：一次会话的逐轮协议（吸收结果、审查提议、拒绝文案、升级），不依赖任何框架 |
+| `session.py` | `HarnessSession`：一次会话的逐轮协议（吸收结果、审查提议、拒绝文案、升级），不依赖任何框架。0.3.0 起含循环守卫（连续相同调用超过上限即拒绝），默认关闭，`full()` 中也关闭 |
 
 ### 一次提议的处理路径
 
