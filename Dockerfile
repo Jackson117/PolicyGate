@@ -21,8 +21,10 @@ WORKDIR /app
 # Dependencies first: the layer survives every source edit. The project itself
 # is installed from source afterwards, so pyproject alone is what invalidates it.
 # tau2 first and on its own layer: it is the heaviest install and the one that
-# changes least -- its commit is pinned. It brings litellm, fastapi, pandas and
-# plotly with it, which is why those are not repeated here.
+# changes least -- its commit is pinned. It brings litellm, fastapi and pandas
+# with it, which is why those are not repeated here. plotly is only in tau2's
+# `experiments` extra (with scikit-learn and seaborn), so the dashboard's charts
+# install it themselves below.
 COPY third_party/tau2-bench/ ./third_party/tau2-bench/
 RUN uv pip install --system --no-cache ./third_party/tau2-bench
 
@@ -31,7 +33,7 @@ RUN uv pip install --system --no-cache \
       "pydantic>=2.9" "deepdiff>=8.4.2" "pyyaml>=6.0" \
       "sqlalchemy>=2.0" "alembic>=1.13" "psycopg[binary]>=3.2" \
       "langgraph>=0.2" "langgraph-checkpoint-postgres>=2.0" \
-      "uvicorn>=0.30" "streamlit>=1.38"
+      "uvicorn>=0.30" "streamlit>=1.38" "plotly>=6.0"
 
 COPY src/ ./src/
 ENV PYTHONPATH=/app/src
@@ -55,7 +57,7 @@ CMD ["uvicorn", "policygate.service.api:build", "--factory", \
 FROM base AS dashboard
 EXPOSE 8501
 # Read-only: the dashboard reads run directories mounted from the host.
-ENV POLICYGATE_RUN_ROOT=/runs POLICYGATE_RUN_DIR=/runs/w4_v4
+ENV POLICYGATE_RUN_ROOT=/runs POLICYGATE_RUN_DIR=/runs/w4_v4 POLICYGATE_RAG_RESULTS=/rag
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"
 CMD ["streamlit", "run", "src/policygate/viz/app.py", \

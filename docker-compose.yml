@@ -50,10 +50,14 @@ services:
     environment:
       POLICYGATE_RUN_ROOT: /runs
       POLICYGATE_RUN_DIR: /runs/w4_v4
+      POLICYGATE_RAG_RESULTS: /rag
     volumes:
       # Read-only: the dashboard reads what the runner wrote on the host and
       # must not be able to alter a result it is displaying.
       - ./experiments:/runs:ro
+      # The banking retrieval study's published results, for its page. Without
+      # the sibling checkout the page says so and shows nothing.
+      - ${POLICYGATE_RAG_RESULTS_HOST:-../policygate-rag/results}:/rag:ro
     ports:
       - "8501:8501"
 

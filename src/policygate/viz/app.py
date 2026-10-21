@@ -21,5 +21,6 @@ st.navigation(
         st.Page(PAGES / "3_Ablation.py", title="Ablation"),
         st.Page(PAGES / "4_Failures.py", title="Failures"),
         st.Page(PAGES / "5_Audit_chain.py", title="Audit chain"),
+        st.Page(PAGES / "6_Banking_RAG.py", title="Banking RAG"),
     ]
 ).run()
