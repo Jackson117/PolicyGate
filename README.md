@@ -1,4 +1,4 @@
-# policygate
+# PolicyGate
 
 A reliability and audit harness for a policy-following agent, measured on
 [τ²-bench](https://github.com/sierra-research/tau2-bench) retail.
