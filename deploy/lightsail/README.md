@@ -108,8 +108,23 @@ export POLICYGATE_DASHBOARD_PASSWORD=...       # what you hand out with the link
 ```
 
 It stages the run data, builds both images, pushes them, deploys, waits, and
-prints the URL. Ten to twenty minutes the first time, mostly uploading two
-images of about 2 GB each.
+prints the URL.
+
+**On an Apple Silicon Mac the first build is slow.** Lightsail runs
+`linux/amd64`, so the images are built for that platform under emulation --
+half an hour is normal, and it caches afterwards. Skipping it does not fail
+until the push, which rejects an arm64 image after the service already exists
+and is billing.
+
+Two more things that bite on a Mac and have nothing to do with AWS:
+
+- `lightsailctl` talks to Docker through the Go SDK, which reads `DOCKER_HOST`
+  and otherwise assumes `/var/run/docker.sock`. It does not read docker
+  contexts, so under Colima or Rancher Desktop `docker build` works and the
+  push cannot find the daemon. The script resolves the endpoint from
+  `docker context inspect` and exports it.
+- The push needs BuildKit for nothing at all -- the legacy builder honours
+  `--platform` -- so there is no buildx requirement.
 
 ## Sizing
 

@@ -32,25 +32,64 @@ echo "==> staging run data"
 # shellcheck disable=SC2086
 ./scripts/stage_deploy.sh $RUNS
 
-echo "==> building images"
-docker build --target service   -t policygate-service:deploy   .
-docker build --target dashboard -t policygate-dashboard:deploy .
+# Lightsail runs linux/amd64. Building on an Apple Silicon Mac without this
+# produces arm64 images that build and run perfectly here and are rejected at
+# the push with "image does not provide linux/amd64 platform" -- after the
+# build, and after the service is already created and billing.
+PLATFORM=${LIGHTSAIL_PLATFORM:-linux/amd64}
+
+echo "==> building images for $PLATFORM"
+echo "    (emulated on an arm64 host: the first build is slow, then it caches)"
+docker build --platform "$PLATFORM" --target service   -t policygate-service:deploy   .
+docker build --platform "$PLATFORM" --target dashboard -t policygate-dashboard:deploy .
 
 if ! aws lightsail get-container-services --service-name "$SERVICE" >/dev/null 2>&1; then
   echo "==> creating container service $SERVICE ($POWER x$SCALE in $REGION)"
   aws lightsail create-container-service \
     --service-name "$SERVICE" --power "$POWER" --scale "$SCALE" >/dev/null
-  echo "    waiting for it to be READY (a few minutes)"
+fi
+
+# Outside the branch above on purpose: a service that already exists can still
+# be PENDING -- created a moment ago, or updating -- and pushing to a registry
+# that is not ready fails after the upload rather than before it.
+state=$(aws lightsail get-container-services --service-name "$SERVICE" \
+          --query 'containerServices[0].state' --output text)
+if [ "$state" != "READY" ]; then
+  echo "==> service is $state; waiting for READY (a few minutes)"
   until [ "$(aws lightsail get-container-services --service-name "$SERVICE" \
               --query 'containerServices[0].state' --output text)" = "READY" ]; do
     sleep 15
   done
 fi
 
+# lightsailctl talks to Docker itself, through the Go SDK, and the SDK looks at
+# DOCKER_HOST or falls back to unix:///var/run/docker.sock. It knows nothing
+# about docker contexts -- so with Colima, Rancher Desktop, or Docker Desktop
+# without the default-socket option, `docker build` works and the push fails
+# with "Cannot connect to the Docker daemon". Hand it the endpoint the docker
+# CLI is actually using.
+if [ -z "${DOCKER_HOST:-}" ]; then
+  endpoint=$(docker context inspect --format '{{.Endpoints.docker.Host}}' 2>/dev/null || true)
+  if [ -n "$endpoint" ] && [ "$endpoint" != "unix:///var/run/docker.sock" ]; then
+    export DOCKER_HOST="$endpoint"
+    echo "==> DOCKER_HOST=$DOCKER_HOST (from the '$(docker context show)' context)"
+  fi
+fi
+
 echo "==> pushing images"
 push() {  # label image -> the ":service.label.N" reference Lightsail assigns
-  command aws --region "$REGION" lightsail push-container-image \
-    --service-name "$SERVICE" --label "$1" --image "$2" 2>&1 \
+  # The output is captured rather than piped so that a failure reaches the log.
+  # Piping it straight into sed prints only the matching line, which on failure
+  # is no line at all -- the error that explains it is dropped, and all that is
+  # left is a non-zero exit from a script with `set -e`.
+  local out
+  if ! out=$(command aws --region "$REGION" lightsail push-container-image \
+               --service-name "$SERVICE" --label "$1" --image "$2" 2>&1); then
+    echo "push of $2 failed:" >&2
+    echo "$out" >&2
+    return 1
+  fi
+  printf '%s\n' "$out" \
     | sed -n 's/.*Refer to this image as "\(.*\)" in deployments.*/\1/p'
 }
 SERVICE_IMAGE=$(push service policygate-service:deploy)
