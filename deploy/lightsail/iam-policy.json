@@ -1,0 +1,25 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DeployPolicygateToLightsail",
+      "Effect": "Allow",
+      "Action": [
+        "lightsail:CreateContainerService",
+        "lightsail:GetContainerServices",
+        "lightsail:UpdateContainerService",
+        "lightsail:DeleteContainerService",
+        "lightsail:CreateContainerServiceDeployment",
+        "lightsail:GetContainerServiceDeployments",
+        "lightsail:CreateContainerServiceRegistryLogin",
+        "lightsail:RegisterContainerImage",
+        "lightsail:GetContainerImages",
+        "lightsail:DeleteContainerImage",
+        "lightsail:GetContainerLog",
+        "lightsail:GetContainerServicePowers",
+        "lightsail:GetRegions"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

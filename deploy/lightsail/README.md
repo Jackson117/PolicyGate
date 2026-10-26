@@ -23,14 +23,55 @@ dashboard, and the dashboard asks for a password first.
 
 ## Once
 
-Install the CLI and the Lightsail plugin, then sign in:
+### 1. An IAM user to deploy as
+
+There is **no AWS managed policy for Lightsail access.** Searching the managed
+policies for "lightsail" returns only `LightsailExportAccess`, which is for
+exporting snapshots to EC2 and is not this. So the permissions are a
+customer-managed policy, and [`iam-policy.json`](iam-policy.json) is one
+scoped to exactly what `deploy.sh` calls — create and update the container
+service, log in to its registry, register an image, deploy, read logs, and
+delete the service when you are done.
+
+In the console: **IAM → Policies → Create policy → JSON**, paste that file,
+name it `PolicygateLightsailDeploy`. Then **IAM → Users → Create user**, attach
+that policy, and under **Security credentials → Create access key** choose
+*Command Line Interface (CLI)*.
+
+Use an IAM user, not the root account: root cannot be scoped, cannot be
+rotated without changing your sign-in, and these keys end up in a shell
+history.
+
+### 2. The CLI and the Lightsail plugin
+
+`push-container-image` is not pure CLI — it shells out to `lightsailctl`, and
+without the plugin the push step fails:
 
 ```bash
 brew install awscli
 curl -L "https://s3.us-west-2.amazonaws.com/lightsailctl/latest/darwin-arm64/lightsailctl" \
   -o /usr/local/bin/lightsailctl && chmod +x /usr/local/bin/lightsailctl
-aws configure          # an IAM user with Lightsail access; region ap-southeast-2 for Sydney
 ```
+
+(`darwin-arm64` for Apple Silicon; `darwin-amd64` for Intel.)
+
+### 3. Credentials and a region
+
+```bash
+aws configure          # the access key from step 1
+```
+
+The region must match the one `deploy.sh` uses — it defaults to
+`ap-southeast-2` (Sydney); `ap-southeast-1` is Singapore. Pass `AWS_REGION` to
+override it.
+
+### 4. A budget alert, before the first deployment
+
+A container service bills hourly for as long as it exists, whether or not
+anyone visits it. **Billing → Budgets → Create budget**, a small monthly
+figure with an email alert, is what stops a demo you stopped showing from
+quietly costing $40 a month. Deleting the service is the other half; see the
+bottom of this file.
 
 ## Every time
 
@@ -90,6 +131,7 @@ image ships until the container dies.
 |---|---|
 | container service, `medium` | $40/month |
 | container service, `micro` | $10/month |
+| new-account credit | AWS replaced Lightsail's old container trial with the Free Tier's credits (up to $200); check Billing → Credits |
 | data transfer | 500 GB included |
 | model calls | whatever visitors spend, bounded per session by `POLICYGATE_SESSION_USD_CAP` |
 
