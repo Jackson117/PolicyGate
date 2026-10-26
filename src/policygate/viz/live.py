@@ -120,15 +120,27 @@ class ServiceClient:
 
 
 def _explain(response: httpx.Response) -> str:
-    """A sentence a person can act on, from whatever the service returned."""
+    """A sentence a person can act on, from whatever the service returned.
+
+    A 500 from FastAPI carries no detail -- the traceback stays in the service
+    log -- so the common causes are named here instead. The first turn of a
+    live session failing on the provider's key is the one that has happened.
+    """
     detail = ""
     try:
         body = response.json()
         detail = body.get("detail") if isinstance(body, dict) else str(body)
     except ValueError:
         detail = response.text[:200]
-    if response.status_code == 500 and "api" in detail.lower() and "key" in detail.lower():
-        detail += " (the service needs a provider key in its environment)"
+
+    if response.status_code == 500:
+        return (
+            "The service failed on this turn (500). Its log has the traceback. "
+            "The usual cause is the model call: a provider key that does not match the "
+            "base URL it is sent to, or no key at all. A shell that exports "
+            "OPENAI_API_KEY shadows the project's .env unless the service was started "
+            "after that was fixed — restart it with `make service`."
+        )
     return f"The service answered {response.status_code}: {detail or 'no detail'}"
 
 

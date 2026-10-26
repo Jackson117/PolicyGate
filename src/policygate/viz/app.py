@@ -10,6 +10,13 @@ from pathlib import Path
 
 import streamlit as st
 
+from policygate.environment import apply_project_env
+
+# Before any page calls a provider. The dashboard embeds a question and talks to
+# the service, and both go wrong quietly when a shell's stray key shadows this
+# project's own (see policygate.environment).
+apply_project_env()
+
 PAGES = Path(__file__).parent / "pages"
 
 st.set_page_config(page_title="policygate", layout="wide")

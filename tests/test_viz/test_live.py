@@ -145,10 +145,11 @@ class TestFailuresArriveAsSentences:
         with pytest.raises(ServiceUnavailable, match="409.*not the one awaited"):
             c.answer("r1", approved=True, reviewer="x")
 
-    def test_a_missing_key_is_named_rather_than_left_as_a_500(self, mock_http):
-        c = answer(mock_http, lambda r: httpx.Response(
-            500, json={"detail": "AuthenticationError: no api key provided"}))
-        with pytest.raises(ServiceUnavailable, match="provider key"):
+    def test_a_500_names_its_usual_cause_since_fastapi_sends_no_detail(self, mock_http):
+        """What a person sees when the model call fails: the service returns a bare
+        500 and keeps the traceback, so the message has to carry the diagnosis."""
+        c = answer(mock_http, lambda r: httpx.Response(500, text="Internal Server Error"))
+        with pytest.raises(ServiceUnavailable, match="provider key that does not match"):
             c.send("s1", "hello")
 
     def test_the_inbox_is_none_rather_than_raising_when_nothing_answers(self, mock_http):

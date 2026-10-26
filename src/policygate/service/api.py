@@ -12,6 +12,7 @@ Run with:
 
 from __future__ import annotations
 
+import logging
 import os
 import uuid
 from contextlib import ExitStack, asynccontextmanager
@@ -32,6 +33,11 @@ from policygate.service.schemas import (
     UserTurn,
 )
 from policygate.store.repo import AuditStore
+
+# uvicorn configures its own loggers and leaves the root one alone, so a module
+# logger here prints nothing under the server this app is run by. Its logger is
+# the one a reader of the service log will actually see.
+logger = logging.getLogger("uvicorn.error")
 
 
 class Service:
@@ -174,7 +180,13 @@ def build() -> FastAPI:
     ``POLICYGATE_AUDIT_URL`` point at Postgres; they must be different databases
     from anything the agent acts on (CLAUDE.md constraint 3).
     """
+    from policygate.environment import apply_project_env, describe
     from policygate.service.checkpointer import checkpointer
+
+    # Before anything reads a key. Launching this with `uvicorn ...` directly,
+    # from a shell that exports another project's OPENAI_API_KEY, otherwise
+    # sends that key to this project's base URL and fails on the first turn.
+    logger.info("provider configuration: %s", describe(apply_project_env()))
 
     resources = ExitStack()
     saver = resources.enter_context(checkpointer())
