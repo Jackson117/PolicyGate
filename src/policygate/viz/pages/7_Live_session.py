@@ -19,7 +19,13 @@ import json
 import streamlit as st
 
 from policygate.viz.data import anchors, chain_integrity, chain_rows
-from policygate.viz.live import DEFAULT_URL, ServiceClient, ServiceUnavailable, records_as_audit
+from policygate.viz.live import (
+    DEFAULT_URL,
+    ServiceClient,
+    ServiceUnavailable,
+    SessionNotFound,
+    records_as_audit,
+)
 from policygate.viz.session import theme
 
 st.title("Live session")
@@ -33,7 +39,8 @@ st.caption(
     "deciding on every tool call. Each turn calls the model, so each turn costs money."
 )
 
-if not client.reachable():
+waiting = client.inbox()
+if waiting is None:
     st.warning(
         f"No service answering at `{url}`.\n\n"
         "Start it locally with `make service` (it needs a provider key in `.env` and a "
@@ -54,6 +61,10 @@ with columns[1]:
     if st.button("New session", width="stretch"):
         try:
             st.session_state["live_session"] = client.open_session()
+            # POST /sessions mints an id; the session exists from its first
+            # message. Remembering that we minted this one is what separates
+            # "nothing said yet" from "that id does not exist".
+            st.session_state["live_session_is_new"] = True
             st.session_state["live_error"] = None
             st.rerun()
         except ServiceUnavailable as exc:
@@ -65,11 +76,6 @@ if st.session_state.get("live_error"):
 # The reviewer's way in. A person approving a write did not start the
 # conversation -- they arrive because something is waiting -- so every session
 # with a pending approval is reachable here, whoever opened it.
-try:
-    waiting = client.pending()
-except ServiceUnavailable as exc:
-    waiting = []
-    st.error(str(exc))
 if waiting:
     st.subheader(f"Waiting for a decision · {len(waiting)}")
     for item in waiting:
@@ -80,6 +86,7 @@ if waiting:
         )
         if columns[1].button("Open", key=f"open-{item.request_id}", width="stretch"):
             st.session_state["live_session"] = item.session_id
+            st.session_state["live_session_is_new"] = False
             st.rerun()
 
 if session_id is None:
@@ -87,6 +94,7 @@ if session_id is None:
         typed = st.text_input("Session id", placeholder="paste a session id")
         if typed:
             st.session_state["live_session"] = typed.strip()
+            st.session_state["live_session_is_new"] = False
             st.rerun()
     st.info(
         "Start a session, then ask for something a retail agent would have to act on — "
@@ -95,12 +103,25 @@ if session_id is None:
     )
     st.stop()
 
-view = client.view(session_id)
+try:
+    view = client.view(session_id)
+except SessionNotFound:
+    # Either a session that has not been spoken to yet, or an id that was
+    # never one. Only the first is worth a chat box.
+    view = None
+    if not st.session_state.get("live_session_is_new"):
+        st.error(f"The service holds no session `{session_id}`.")
+        if st.button("Forget it"):
+            st.session_state["live_session"] = None
+            st.rerun()
+        st.stop()
 
 # --- what was said --------------------------------------------------------
 
 st.subheader("Conversation")
-for message in view.transcript:
+if view is None:
+    st.caption("Nothing said yet. The session starts with your first message.")
+for message in (view.transcript if view else []):
     role = message.get("role")
     if role == "system":
         continue
@@ -118,7 +139,7 @@ for message in view.transcript:
 
 # --- the approval gate ----------------------------------------------------
 
-pending = view.pending_approval
+pending = view.pending_approval if view else None
 if pending is not None:
     st.subheader("Waiting for you")
     st.warning(
@@ -158,7 +179,10 @@ if prompt:
 
 # --- what the harness did -------------------------------------------------
 
-claimed_intact, claimed_breaks, raw = client.audit(session_id)
+try:
+    claimed_intact, claimed_breaks, raw = client.audit(session_id)
+except SessionNotFound:
+    claimed_intact, claimed_breaks, raw = True, [], []
 records = records_as_audit(raw)
 rows = chain_rows(records)
 # Verified here, from the records themselves, rather than taking the service's

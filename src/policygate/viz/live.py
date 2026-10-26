@@ -34,6 +34,15 @@ class ServiceUnavailable(RuntimeError):
     """The service could not be reached, or answered with an error."""
 
 
+class SessionNotFound(ServiceUnavailable):
+    """The service holds no state for that session id.
+
+    Not an error on its own: ``POST /sessions`` only mints an id, and the
+    session exists from its first message, so a session just opened is in this
+    state too. The caller knows which case it is; this only reports the fact.
+    """
+
+
 class ServiceClient:
     """The six endpoints of policygate.service.api, typed by its own schemas."""
 
@@ -55,6 +64,8 @@ class ServiceClient:
                 f"The service did not answer within {self._timeout:.0f}s. A turn calls the "
                 "model several times; check the service log."
             ) from exc
+        if response.status_code == 404:
+            raise SessionNotFound(_explain(response))
         if response.status_code >= 400:
             raise ServiceUnavailable(_explain(response))
         return response.json()
@@ -95,12 +106,17 @@ class ServiceClient:
             )
         )
 
-    def reachable(self) -> bool:
+    def inbox(self) -> list[PendingApproval] | None:
+        """Pending approvals, or None when the service cannot be reached.
+
+        One call answers both questions the page asks -- is it up, and what is
+        waiting -- so a rerun does not hit /approvals twice to learn the same
+        thing.
+        """
         try:
-            self.pending()
+            return self.pending()
         except ServiceUnavailable:
-            return False
-        return True
+            return None
 
 
 def _explain(response: httpx.Response) -> str:

@@ -151,8 +151,31 @@ class TestFailuresArriveAsSentences:
         with pytest.raises(ServiceUnavailable, match="provider key"):
             c.send("s1", "hello")
 
-    def test_reachable_is_false_rather_than_raising(self, mock_http):
+    def test_the_inbox_is_none_rather_than_raising_when_nothing_answers(self, mock_http):
         def handler(request):
             raise httpx.ConnectError("refused", request=request)
 
-        assert answer(mock_http, handler).reachable() is False
+        assert answer(mock_http, handler).inbox() is None
+
+    def test_the_inbox_answers_both_questions_in_one_call(self, mock_http):
+        """Up, and what is waiting. A rerun should not ask /approvals twice."""
+        calls = []
+
+        def handler(request):
+            calls.append(str(request.url))
+            return httpx.Response(200, json=[TURN["approval"]])
+
+        inbox = answer(mock_http, handler).inbox()
+        assert [p.request_id for p in inbox] == ["r1"]
+        assert len(calls) == 1
+
+    def test_an_unknown_session_is_its_own_kind_of_failure(self, mock_http):
+        """POST /sessions only mints an id, so 404 also means 'not spoken to yet'."""
+        from policygate.viz.live import SessionNotFound
+
+        c = answer(mock_http, lambda r: httpx.Response(404, json={"detail": "no session s9"}))
+        with pytest.raises(SessionNotFound, match="no session s9"):
+            c.view("s9")
+        # and it stays catchable as the general failure
+        with pytest.raises(ServiceUnavailable):
+            c.view("s9")
