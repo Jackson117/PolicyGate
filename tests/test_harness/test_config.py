@@ -1,7 +1,7 @@
 """Contract tests for harness/config.py.
 
 The ablation matrix is generated from HarnessConfig, so these tests guard the
-property CLAUDE.md cares about: a mechanism that exists has a switch, and a
+property docs/constraints.md cares about: a mechanism that exists has a switch, and a
 switch that exists produces a row.
 """
 

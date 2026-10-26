@@ -7,7 +7,7 @@
 W4 只跑 retail（114 任务）。结论只对 retail 成立。
 airline 与 banking_knowledge 都缺整套 adapter（工具角色、事实提取、约束）和做功效分析用的基线；
 `RunPlan.domain` 限定为 `"retail"`，代码层面不会误跑其他域。
-若日后扩域，优先 banking_knowledge：87/97 任务纯 DB 评分，且正是 CLAUDE.md 描述的退款/争议场景。
+若日后扩域，优先 banking_knowledge：87/97 任务纯 DB 评分，且正是 项目简介 描述的退款/争议场景。
 
 ## 臂的构成：one enabled at a time
 

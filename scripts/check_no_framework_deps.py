@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Enforce CLAUDE.md constraint #2: harness/ imports no agent framework.
+"""Enforce docs/constraints.md #2: harness/ imports no agent framework.
 
 The harness is the original contribution of this project. Handing any of it to
 LangGraph, LiteLLM or tau2 would outsource the part worth showing, and it would
@@ -29,11 +29,11 @@ BANNED_WITH_REASON = {
     "litellm": "an LLM client; harness/ logic must be testable without a model",
     "openai": "an LLM client; harness/ logic must be testable without a model",
     "anthropic": "an LLM client; harness/ logic must be testable without a model",
-    "langgraph": "an agent framework; the harness owns this logic, see CLAUDE.md #2",
-    "langchain": "an agent framework; the harness owns this logic, see CLAUDE.md #2",
-    "llama_index": "an agent framework; the harness owns this logic, see CLAUDE.md #2",
-    "autogen": "an agent framework; the harness owns this logic, see CLAUDE.md #2",
-    "crewai": "an agent framework; the harness owns this logic, see CLAUDE.md #2",
+    "langgraph": "an agent framework; the harness owns this logic, see docs/constraints.md #2",
+    "langchain": "an agent framework; the harness owns this logic, see docs/constraints.md #2",
+    "llama_index": "an agent framework; the harness owns this logic, see docs/constraints.md #2",
+    "autogen": "an agent framework; the harness owns this logic, see docs/constraints.md #2",
+    "crewai": "an agent framework; the harness owns this logic, see docs/constraints.md #2",
 }
 
 

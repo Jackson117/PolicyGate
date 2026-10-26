@@ -230,7 +230,7 @@ uv run python scripts/w4_run.py --budget 30 --out experiments/my_run --dry-run
 | `src/policygate/service/` | The deployment: LangGraph graph, human approval via `interrupt`, world rebuilt by replay |
 | `src/policygate/store/` | The audit database — separate from τ²'s world state, always |
 | `src/policygate/viz/` | Streamlit dashboard: headline, paired traces, ablation, failure migration, and the banking retrieval study run on this harness ([policygate-rag](https://github.com/Jackson117/PolicyGate-rag), read from its published `results/`) |
-| `docs/` | Findings, design and pre-registration, results |
+| `docs/` | [The five hard constraints](docs/constraints.md), findings, design and pre-registration, results |
 | `experiments/` | Each run's plan and ledger: fingerprint, code identity, per-chunk spend |
 
 8,900 lines of source, 6,000 of tests, 534 tests.

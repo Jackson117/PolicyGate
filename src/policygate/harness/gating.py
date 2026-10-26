@@ -27,7 +27,7 @@ general questions through unauthenticated; the roles
 :attr:`~policygate.harness.types.ToolRole.SUBJECT_INDEPENDENT` carry that, and a
 catalogue without them gates exactly as before.
 
-Pydantic and the standard library only. See CLAUDE.md constraint #2.
+Pydantic and the standard library only. See docs/constraints.md #2.
 """
 
 from __future__ import annotations

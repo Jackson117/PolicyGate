@@ -28,7 +28,7 @@ comments:
   machine version of the task 14 failure, and an approval gate that allows it
   is not a gate.
 
-Pydantic and the standard library only. See CLAUDE.md constraint #2.
+Pydantic and the standard library only. See docs/constraints.md #2.
 """
 
 from __future__ import annotations

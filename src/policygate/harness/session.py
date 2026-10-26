@@ -16,7 +16,7 @@ What stays with the caller:
 * building whatever message type its framework speaks from the
   ``(call_id, text)`` refusals and the escalation tool name returned here.
 
-Pydantic and the standard library only. See CLAUDE.md constraint #2.
+Pydantic and the standard library only. See docs/constraints.md #2.
 """
 
 from __future__ import annotations

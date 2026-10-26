@@ -19,7 +19,7 @@ costs -- the first is a compliance incident, the second is friction. Summing
 them, or folding them into an F1, would let one hide the other, so this module
 does not provide the means.
 
-Pydantic and the standard library only. See CLAUDE.md constraint #2.
+Pydantic and the standard library only. See docs/constraints.md #2.
 """
 
 from __future__ import annotations

@@ -24,7 +24,7 @@ hash is recomputed from the stored timestamp -- but a chain that calls
 ``datetime.now()`` cannot be reproduced by re-running the same experiment, and
 cannot be asserted on in a test.
 
-Pydantic, deepdiff and the standard library only. See CLAUDE.md constraint #2.
+Pydantic, deepdiff and the standard library only. See docs/constraints.md #2.
 """
 
 from __future__ import annotations

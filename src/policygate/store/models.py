@@ -1,6 +1,6 @@
 """Tables for the deployment's audit store.
 
-CLAUDE.md constraint 3: this is its own database, never the world-state store the
+docs/constraints.md #3: this is its own database, never the world-state store the
 agent acts on. In the demo the world is tau2's in-memory retail database; the
 audit store is Postgres. Nothing here can reach the former.
 

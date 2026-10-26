@@ -17,7 +17,7 @@
 
 任务量核对（跑 `get_tasks` 实测，非引用文档）：
 retail **114**、banking_knowledge **97**、airline **50**、telecom **2285**。
-前两个与 CLAUDE.md 一致；airline 和 telecom 的数字 CLAUDE.md 没写，记在这里备用。
+前两个与 项目简介 一致；airline 和 telecom 的数字 项目简介 没写，记在这里备用。
 
 ### 踩到的坑：iCloud Drive 同步 `~/Documents`，editable 安装静默失效
 
@@ -61,7 +61,7 @@ iCloud 抢得比脚本快。
 ## 2. tau2 契约（读源码确认，非推测）
 
 - agent 基类 `HalfDuplexAgent`，实现 `get_init_state` / `generate_next_message`。
-  与 CLAUDE.md 记的一致。
+  与 项目简介 记的一致。
 - **消息格式约束**（`base_agent.py: validate_message_format_default`）：
   一条 `AssistantMessage` 只能**要么**有文本内容**要么**有 tool call，
   两者都有或都没有都判非法。
@@ -116,7 +116,7 @@ tau2 会**换个种子把这条 simulation 重跑一遍**。
 
 ## 3. 止损判据需要修正
 
-CLAUDE.md 写的是「pass^1 三轮之间波动在 ±2% 内 → 信号干净」。
+项目简介 写的是「pass^1 三轮之间波动在 ±2% 内 → 信号干净」。
 **这个判据在 30 任务上测不出来**，理由：
 
 聚合通过率的最小变动步长是 1/30 = **3.3pp**。所以「波动 < 2%」等价于
@@ -190,9 +190,9 @@ function calling 是已知可用的路径。
 
 ---
 
-## 6. ⚠️ 修正一条 CLAUDE.md 里的事实：retail 的评分**含 LLM 判分**
+## 6. ⚠️ 修正一条 项目简介 里的事实：retail 的评分**含 LLM 判分**
 
-CLAUDE.md 写：「评分是世界状态哈希比对，**不是文本比对，不是 LLM 判分**」。
+项目简介 写：「评分是世界状态哈希比对，**不是文本比对，不是 LLM 判分**」。
 这条对 retail **不成立**。实测每个任务的 `evaluation_criteria.reward_basis`：
 
 | 域 | reward_basis 分布 |
@@ -225,7 +225,7 @@ retail 里真正带非空断言的只有 **40/114**；
 
 ### 附带确认：banking_knowledge 的 ACTION 任务是这 9 个
 
-CLAUDE.md 提醒过「banking_knowledge 有小部分任务用 `RewardType.ACTION`，
+项目简介 提醒过「banking_knowledge 有小部分任务用 `RewardType.ACTION`，
 需要筛出单独处理」。实测就是 9 个：
 `task_004 task_008 task_012 task_014 task_032 task_033 task_034 task_035 task_083`。
 
@@ -313,7 +313,7 @@ retail 没走到它，换域时要留意。
 
 ### 判据怎么读
 
-按 CLAUDE.md 字面：spread 13.3pp > ±10%，落在
+按 项目简介 字面：spread 13.3pp > ±10%，落在
 「噪声压过信号，需重新设计」那一档。**但这个诊断在这里是错的。**
 
 分解结果说明了原因：**噪声几乎全在 DB 分量**（53% 翻转），

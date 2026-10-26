@@ -1,6 +1,6 @@
 """Translation between tau2's world and the harness's.
 
-The harness is forbidden to import tau2 (CLAUDE.md #2), so everything that
+The harness is forbidden to import tau2 (docs/constraints.md #2), so everything that
 knows about both lives here. Three jobs:
 
 * turn a tau2 toolkit into a :class:`~policygate.harness.types.ToolSpec`

@@ -53,7 +53,7 @@ precondition. Not one was a type error or a missing argument -- so
 ``schema_check_enabled`` is insurance with no W1 evidence behind it, unlike the
 other three switches, and should be read that way in the ablation table.
 
-Pydantic and the standard library only. See CLAUDE.md constraint #2.
+Pydantic and the standard library only. See docs/constraints.md #2.
 """
 
 from __future__ import annotations

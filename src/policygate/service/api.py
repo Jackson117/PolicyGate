@@ -178,7 +178,7 @@ def build() -> FastAPI:
     Opens the checkpointer and the audit store for the life of the app and
     closes them on shutdown. ``POLICYGATE_CHECKPOINT_URL`` and
     ``POLICYGATE_AUDIT_URL`` point at Postgres; they must be different databases
-    from anything the agent acts on (CLAUDE.md constraint 3).
+    from anything the agent acts on (docs/constraints.md #3).
     """
     from policygate.environment import apply_project_env, describe
     from policygate.service.checkpointer import checkpointer

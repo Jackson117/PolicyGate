@@ -3,7 +3,7 @@
 #   docker compose up --build            # service on :8000, dashboard on :8501
 #   docker compose run --rm service pytest  # not available: tests are not in the image
 #
-# The audit store is its own Postgres and never tau2's world state. CLAUDE.md
+# The audit store is its own Postgres and never tau2's world state. docs/constraints.md
 # constraint #3: scoring compares the world-state database by hash, so one extra
 # byte written there fails every task.
 

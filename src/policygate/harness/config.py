@@ -12,7 +12,7 @@ three distinct things in the retail traces -- non-canonical enum values
 itself rejects (31x "Order not found") -- and folding them into one flag would
 make it impossible to say which of them earned any improvement.
 
-Pydantic and the standard library only. See CLAUDE.md constraint #2.
+Pydantic and the standard library only. See docs/constraints.md #2.
 """
 
 from __future__ import annotations

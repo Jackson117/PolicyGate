@@ -247,7 +247,7 @@ full 内部的剂量关系：0 次拒绝的 simulation pass^1 = 0.658（n=114）
 
 ## 9. 未做与限制
 
-- **只跑 retail**，结论不外推到其他域。CLAUDE.md 建议的 banking_knowledge
+- **只跑 retail**，结论不外推到其他域。项目简介 建议的 banking_knowledge
   （87/97 纯 DB 评分）更贴合论点，但需要整套 adapter。
 - **归因阶段功效不足**：每臂 114 任务但只有 1 轮，MDE 下限 +9.3pp，
   且对照 baseline trial 0 带来约 +0.035 的整体偏移（第 6 节）。

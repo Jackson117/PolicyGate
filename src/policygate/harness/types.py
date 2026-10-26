@@ -1,6 +1,6 @@
 """Shared data models for the harness.
 
-Hard constraint (CLAUDE.md #2): this package imports Pydantic and the standard
+Hard constraint (docs/constraints.md #2): this package imports Pydantic and the standard
 library, and nothing else. No LangGraph, no LiteLLM, no tau2. Everything here
 must be constructible and testable without an LLM, a benchmark, or a network.
 
