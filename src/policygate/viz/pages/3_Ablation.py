@@ -11,7 +11,7 @@ import streamlit as st
 
 from policygate.eval.passk import ExclusionPolicy
 from policygate.viz import charts
-from policygate.viz.data import compare_arms
+from policygate.viz.data import matched_to_baseline
 from policygate.viz.session import partial_run_notice, run_view, theme
 
 st.title("Ablation")
@@ -40,18 +40,23 @@ for arm in run.arms:
     if arm.name == "baseline" or not arm.simulations:
         continue
     try:
-        rows.append((arm.name, compare_arms(arm, baseline, component=component, policy=policy)))
+        # Matched on (task, trial), not against the baseline's five-trial mean:
+        # an attribution arm ran one trial, and comparing it with a mean over
+        # five shifts every arm by the gap between that mean and trial 0.
+        comparison = matched_to_baseline(arm, baseline, component=component, policy=policy)
     except ValueError:
         continue  # no task scored in both arms yet
+    if comparison is not None:
+        rows.append((arm.name, comparison))
 if not rows:
     st.info("No arm shares a completed task with the baseline yet.")
     st.stop()
 
 st.plotly_chart(charts.attribution_forest(rows, t), width="stretch", theme=None)
 st.caption(
-    "Single-mechanism arms are compared with the baseline under Holm correction across the "
-    "family; p-values below are unadjusted. Effects need not add up to full − baseline: "
-    "the gap is interaction between mechanisms."
+    "Each arm is compared with the baseline on the (task, trial) pairs both actually ran, "
+    "under Holm correction across the family; p-values below are unadjusted. Effects need "
+    "not add up to full − baseline: the gap is interaction between mechanisms."
 )
 
 with st.expander("Table view", expanded=True):
