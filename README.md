@@ -210,6 +210,14 @@ make viz
 docker compose up --build   # service :8000, dashboard :8501
 ```
 
+On a public URL it is the same two containers, with two things that matter
+once a stranger can click: a password in front of the dashboard, and a
+per-session spend cap in the service, checked before the model call rather than
+after. The approval service has no public port at all — the only route to a
+model call is through the dashboard. **[`deploy/lightsail/`](deploy/lightsail/README.md)**
+has the runbook, the measured memory per run, and what the demo deliberately
+does without.
+
 Running an evaluation costs money and needs a provider key in `.env`
 (copy `.env.example`). The full W4 plan is 1938 simulations, so start with
 `--dry-run`, which prints the schedule and the estimate and spends nothing:
@@ -231,9 +239,10 @@ uv run python scripts/w4_run.py --budget 30 --out experiments/my_run --dry-run
 | `src/policygate/store/` | The audit database — separate from τ²'s world state, always |
 | `src/policygate/viz/` | Streamlit dashboard: headline, paired traces, ablation, failure migration, and the banking retrieval study run on this harness ([policygate-rag](https://github.com/Jackson117/PolicyGate-rag), read from its published `results/`) |
 | `docs/` | [The five hard constraints](docs/constraints.md), findings, design and pre-registration, results |
+| `deploy/` | The public deployment: one Lightsail container service, two containers, one URL |
 | `experiments/` | Each run's plan and ledger: fingerprint, code identity, per-chunk spend |
 
-8,900 lines of source, 6,000 of tests, 534 tests.
+9,100 lines of source, 6,100 of tests, 547 tests.
 
 ---
 

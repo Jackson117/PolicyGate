@@ -131,6 +131,8 @@ class Service:
             pending_approval=self._pending(session_id, values),
             audit_records=len(self.store.records(session_id)),
             audit_intact=verification.intact,
+            spent_usd=float(values.get("spent_usd") or 0.0),
+            session_usd_cap=self.runtime.session_usd_cap,
         )
 
 
@@ -192,6 +194,14 @@ def build() -> FastAPI:
     saver = resources.enter_context(checkpointer())
     store = AuditStore.from_url(os.environ.get("POLICYGATE_AUDIT_URL", "sqlite:///audit.db"))
 
+    # Unset means no limit, which is right on your own machine and wrong on a
+    # public URL: there, every visitor spends the same budget.
+    raw_cap = os.environ.get("POLICYGATE_SESSION_USD_CAP")
+    cap = float(raw_cap) if raw_cap else None
+    logger.info(
+        "session spend cap: %s", f"${cap:.2f}" if cap is not None else "none (unlimited)"
+    )
+
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         try:
@@ -199,4 +209,6 @@ def build() -> FastAPI:
         finally:
             resources.close()
 
-    return create_app(Service(RetailRuntime(), store, saver), lifespan=lifespan)
+    return create_app(
+        Service(RetailRuntime(session_usd_cap=cap), store, saver), lifespan=lifespan
+    )

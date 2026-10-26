@@ -40,3 +40,8 @@ class SessionView(BaseModel):
     pending_approval: PendingApproval | None
     audit_records: int
     audit_intact: bool
+    spent_usd: float = 0.0
+    """What this session's model calls have cost."""
+
+    session_usd_cap: float | None = None
+    """What it is allowed to spend, or None where nothing limits it."""

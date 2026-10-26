@@ -82,6 +82,7 @@ class RetailRuntime:
         generate_fn: Generate = generate,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         max_internal_attempts: int = 3,
+        session_usd_cap: float | None = None,
     ) -> None:
         self.llm = llm
         self.llm_args = llm_args if llm_args is not None else {"temperature": 0.0}
@@ -89,6 +90,13 @@ class RetailRuntime:
         self.generate = generate_fn
         self.clock = clock
         self.max_internal_attempts = max_internal_attempts
+        self.session_usd_cap = session_usd_cap
+        """What one session may spend on the model before it stops answering.
+
+        A public deployment hands a stranger a button that calls a model, so the
+        budget needs a limit that does not depend on the stranger. None means no
+        limit, which is the right default for a run on your own machine.
+        """
 
         environment = self._fresh_environment()
         self.tools = environment.get_tools()

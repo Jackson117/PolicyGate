@@ -34,7 +34,18 @@ def discover_runs(root: Path = RUN_ROOT, *, default: Path = DEFAULT_RUN) -> list
     return found
 
 
-@st.cache_resource(show_spinner="Loading run…")
+RUN_CACHE = int(os.environ.get("POLICYGATE_RUN_CACHE", "2"))
+"""How many runs may be held in memory at once.
+
+The cache is one per server process, shared by everyone connected, and a run is
+hundreds of megabytes of parsed simulations -- w4_v4 and its ablation together
+measure about 1.1 GB. Without a limit, a visitor who clicks through the run
+selector loads every run the deployment ships and the container dies. Two is
+enough to compare a run with its ablation without re-reading; set it to 1 on a
+box with a gigabyte."""
+
+
+@st.cache_resource(show_spinner="Loading run…", max_entries=RUN_CACHE)
 def _load(path: str, version: float) -> RunView:
     # `version` is the ledger's mtime: a finished chunk invalidates the cache, a
     # page reload in between does not re-read thousands of simulations.

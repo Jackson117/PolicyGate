@@ -11,6 +11,7 @@ from pathlib import Path
 import streamlit as st
 
 from policygate.environment import apply_project_env
+from policygate.viz.auth import require_password
 
 # Before any page calls a provider. The dashboard embeds a question and talks to
 # the service, and both go wrong quietly when a shell's stray key shadows this
@@ -20,6 +21,12 @@ apply_project_env()
 PAGES = Path(__file__).parent / "pages"
 
 st.set_page_config(page_title="policygate", layout="wide")
+
+# Before the pages are registered, so nothing a page does -- read a run, call
+# the service, embed a query -- is reachable without the password. No-op unless
+# POLICYGATE_DASHBOARD_PASSWORD is set, which is how it stays out of the way
+# locally.
+require_password()
 st.navigation(
     [
         st.Page(PAGES / "0_Overview.py", title="Overview", default=True),

@@ -64,6 +64,20 @@ class ServiceClient:
                 f"The service did not answer within {self._timeout:.0f}s. A turn calls the "
                 "model several times; check the service log."
             ) from exc
+        except httpx.InvalidURL as exc:
+            # The sidebar lets anyone edit this address, so a typo arrives here
+            # as an exception from the client's constructor -- before any
+            # request, and outside what the two cases above catch.
+            raise ServiceUnavailable(
+                f"`{self.base_url}` is not a usable address ({exc}). It needs a scheme "
+                "and a host, like `http://localhost:8000`."
+            ) from exc
+        except httpx.HTTPError as exc:
+            # Everything else httpx can raise -- DNS, TLS, a broken proxy. A
+            # page that must explain a failure cannot afford an uncaught one.
+            raise ServiceUnavailable(
+                f"Could not reach {self.base_url}: {type(exc).__name__}: {exc}"
+            ) from exc
         if response.status_code == 404:
             raise SessionNotFound(_explain(response))
         if response.status_code >= 400:

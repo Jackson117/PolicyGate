@@ -16,7 +16,7 @@ from sqlalchemy.pool import StaticPool
 from tau2.data_model.message import AssistantMessage, ToolCall
 
 from policygate.service.api import Service, create_app
-from policygate.service.graph import ESCALATION_TEXT
+from policygate.service.graph import ESCALATION_TEXT, EXHAUSTED_TEXT
 from policygate.service.runtime import RetailRuntime
 from policygate.store.repo import AuditStore
 
@@ -66,8 +66,8 @@ def saver():
     return InMemorySaver()
 
 
-def client_for(script, store, saver):
-    service = Service(RetailRuntime(generate_fn=script), store, saver)
+def client_for(script, store, saver, **runtime_args):
+    service = Service(RetailRuntime(generate_fn=script, **runtime_args), store, saver)
     return TestClient(create_app(service)), service
 
 
@@ -204,3 +204,60 @@ def test_a_model_that_keeps_proposing_refused_actions_is_handed_to_a_human(store
              if r["decision"]]
     assert rules.count("gating.identity_first") == 3
     assert rules[-1] == "gating.budget_exhausted"
+
+
+# --- the spend cap: what makes a public URL survivable -----------------------
+
+
+def costing(text, usd):
+    """A scripted reply that reports what it cost, the way litellm does."""
+    return AssistantMessage(role="assistant", content=text, cost=usd)
+
+
+def test_the_session_reports_what_it_has_spent(store, saver):
+    script = Script(costing("Hello.", 0.004), costing("Still here.", 0.006))
+    client, _ = client_for(script, store, saver, session_usd_cap=1.0)
+    sid = open_session(client)
+
+    client.post(f"/sessions/{sid}/messages", json={"content": "hi"})
+    client.post(f"/sessions/{sid}/messages", json={"content": "again"})
+
+    view = client.get(f"/sessions/{sid}").json()
+    assert view["spent_usd"] == pytest.approx(0.010)
+    assert view["session_usd_cap"] == 1.0
+
+
+def test_a_spent_session_stops_before_calling_the_model(store, saver):
+    """The cap is checked before the call. One reply is scripted; a second
+    request must not reach for it."""
+    script = Script(costing("That cost a lot.", 0.50))
+    client, _ = client_for(script, store, saver, session_usd_cap=0.25)
+    sid = open_session(client)
+
+    first = client.post(f"/sessions/{sid}/messages", json={"content": "hi"}).json()
+    assert first["reply"] == "That cost a lot."
+
+    second = client.post(f"/sessions/{sid}/messages", json={"content": "again"}).json()
+    assert second["reply"] == EXHAUSTED_TEXT
+    assert second["status"] == "replied"
+    # Script raises if asked for a reply it does not have, so an empty one that
+    # was never consulted is the proof that no model call was made.
+    assert script.replies == []
+    assert len(script.offered) == 1
+
+    view = client.get(f"/sessions/{sid}").json()
+    assert view["spent_usd"] == pytest.approx(0.50)
+    # The refusal is in the conversation, not only in a log.
+    assert view["transcript"][-1]["content"] == EXHAUSTED_TEXT
+
+
+def test_no_cap_means_no_cap(store, saver):
+    script = Script(costing("One.", 5.0), costing("Two.", 5.0))
+    client, _ = client_for(script, store, saver)
+    sid = open_session(client)
+
+    client.post(f"/sessions/{sid}/messages", json={"content": "hi"})
+    second = client.post(f"/sessions/{sid}/messages", json={"content": "again"}).json()
+
+    assert second["reply"] == "Two."
+    assert client.get(f"/sessions/{sid}").json()["session_usd_cap"] is None

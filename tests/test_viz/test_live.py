@@ -180,3 +180,28 @@ class TestFailuresArriveAsSentences:
         # and it stays catchable as the general failure
         with pytest.raises(ServiceUnavailable):
             c.view("s9")
+
+
+# --- a bad address is a message, not a traceback -----------------------------
+
+
+def test_an_unusable_service_url_is_explained(monkeypatch):
+    """The sidebar lets anyone edit the address, and httpx raises from the
+    client's constructor -- before any request -- so it has its own case."""
+    client = ServiceClient("http://localhost:8000demo")
+    with pytest.raises(ServiceUnavailable) as caught:
+        client.pending()
+    assert "not a usable address" in str(caught.value)
+    assert "http://localhost:8000" in str(caught.value)
+
+
+def test_any_other_transport_failure_is_explained(mock_http):
+    """DNS, TLS, a broken proxy -- a page whose job is to explain a failure
+    cannot afford an httpx exception it does not know about."""
+    def drops_it(_request):
+        raise httpx.ProtocolError("the server dropped it")
+
+    with pytest.raises(ServiceUnavailable) as caught:
+        answer(mock_http, drops_it).pending()
+    assert "ProtocolError" in str(caught.value)
+    assert "the server dropped it" in str(caught.value)

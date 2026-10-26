@@ -12,6 +12,10 @@ docs
 tests
 list
 *.log
+# Staged by scripts/stage_deploy.sh immediately before a build: the run data the
+# dashboard reads, which git does not carry and Lightsail cannot mount.
+deploy
+!deploy/stage/**
 
 third_party/tau2-bench/.git
 third_party/tau2-bench/data/**

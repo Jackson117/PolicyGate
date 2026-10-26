@@ -41,3 +41,4 @@ audit.db
 # Project brief for Claude Code: local working notes, not part of the published
 # project. Kept out of git deliberately.
 CLAUDE.md
+deploy/stage/

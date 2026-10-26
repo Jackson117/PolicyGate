@@ -61,11 +61,18 @@ class ServiceState(TypedDict, total=False):
     pending_approval: dict[str, Any] | None
     attempts: int
     reply: str | None
+    spent_usd: Annotated[float, operator.add]
+    """What this session's model calls have cost so far, summed across turns."""
 
 
 ESCALATION_TEXT = (
     "I'm not able to complete this request within what I'm allowed to do. "
     "I'm handing you to a human agent."
+)
+
+EXHAUSTED_TEXT = (
+    "This session has spent its model budget, so I can't take another turn. "
+    "Start a new session to carry on."
 )
 
 
@@ -110,6 +117,18 @@ def build_graph(runtime: RetailRuntime, checkpointer: Any):
     config = runtime.config
 
     def propose(state: ServiceState) -> dict[str, Any]:
+        cap = runtime.session_usd_cap
+        if cap is not None and state.get("spent_usd", 0.0) >= cap:
+            # Checked before the call, not after: a cap that is only noticed
+            # once the money is gone is not a cap. The turn ends here, and the
+            # refusal is in the transcript rather than only in a log.
+            return {
+                "messages": [dump(AssistantMessage(role="assistant", content=EXHAUSTED_TEXT))],
+                "proposal": None,
+                "reply": EXHAUSTED_TEXT,
+                "attempts": 0,
+            }
+
         step = _Step(runtime, state)
         offered = runtime.tools
         if config.context_pruning_enabled:
@@ -121,7 +140,10 @@ def build_graph(runtime: RetailRuntime, checkpointer: Any):
             model=runtime.llm, tools=offered, messages=messages,
             call_name="service_agent_response", **runtime.llm_args,
         )
-        update: dict[str, Any] = {"messages": [dump(response)]}
+        update: dict[str, Any] = {
+            "messages": [dump(response)],
+            "spent_usd": response.cost or 0.0,
+        }
         if response.tool_calls:
             update["proposal"] = dump(response)
             update["reply"] = None

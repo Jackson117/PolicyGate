@@ -56,7 +56,14 @@ CMD ["uvicorn", "policygate.service.api:build", "--factory", \
 
 FROM base AS dashboard
 EXPOSE 8501
-# Read-only: the dashboard reads run directories mounted from the host.
+# The runs the dashboard reads, and the banking study's published results.
+# Baked in rather than mounted: a Lightsail container service has no volume,
+# and this data is deliberately not in git. scripts/stage_deploy.sh puts it
+# here; an empty stage builds an image whose pages say they have no data
+# instead of failing. Compose still mounts the host's experiments/ over /runs,
+# so a local run reads the host's copy and this is only what ships.
+COPY --chown=policygate deploy/stage/runs/ /runs/
+COPY --chown=policygate deploy/stage/rag/ /rag/
 ENV POLICYGATE_RUN_ROOT=/runs POLICYGATE_RUN_DIR=/runs/w4_v4 POLICYGATE_RAG_RESULTS=/rag
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"

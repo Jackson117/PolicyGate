@@ -49,3 +49,16 @@ purity:
 # The deployment path: the approval service the Live session page talks to.
 service:
 	$(ENV) $(UV) run uvicorn policygate.service.api:build --factory --port 8000
+
+# --- deployment -----------------------------------------------------------
+
+.PHONY: stage images deploy
+stage:  ## Collect the run data the dashboard image needs (deploy/stage/)
+	./scripts/stage_deploy.sh
+
+images: stage  ## Build both deployment images locally
+	docker build --target service   -t policygate-service:deploy   .
+	docker build --target dashboard -t policygate-dashboard:deploy .
+
+deploy:  ## Build, push and deploy to Lightsail (see deploy/lightsail/README.md)
+	./deploy/lightsail/deploy.sh

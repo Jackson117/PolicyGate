@@ -116,6 +116,23 @@ except SessionNotFound:
             st.rerun()
         st.stop()
 
+# --- what it has cost -----------------------------------------------------
+
+# A public deployment hands a stranger a button that calls a model, so the
+# service caps what one session may spend. Showing the cap rather than only
+# enforcing it means the visitor who hits it knows why, and that the number is
+# the real one: it is summed from what each call reported, not estimated.
+if view is not None:
+    spent = f"\\${view.spent_usd:.4f}"
+    if view.session_usd_cap:
+        allowed = f"\\${view.session_usd_cap:.2f}"
+        st.progress(
+            min(view.spent_usd / view.session_usd_cap, 1.0),
+            text=f"Model spend this session: {spent} of {allowed}",
+        )
+    elif view.spent_usd:
+        st.caption(f"Model spend this session: {spent}. No cap is set.")
+
 # --- what was said --------------------------------------------------------
 
 st.subheader("Conversation")
