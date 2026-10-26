@@ -37,3 +37,7 @@ audit.db
 
 # Editor/agent workspace config
 .claude/
+
+# Project brief for Claude Code: local working notes, not part of the published
+# project. Kept out of git deliberately.
+CLAUDE.md
