@@ -235,3 +235,16 @@ def test_every_page_file_is_registered_in_the_navigation():
         if 'PAGES / "' in line:
             listed.add(line.split('PAGES / "')[1].split('"')[0])
     assert on_disk == listed
+
+
+def test_a_session_with_no_reference_is_not_accused_of_running_the_wrong_thing():
+    """A live session has no reference trajectory. Without a guard, every call it
+    makes reads as 'not in the reference', which is an accusation, not evidence."""
+    record = built(
+        (AuditEvent.TOOL_EXECUTED, call("find_user_id_by_name_zip", zip="76171"), allow()),
+        (AuditEvent.TOOL_EXECUTED, call("cancel_pending_order", order_id="#W1"), allow()),
+    )
+    assert anchors(record, reference=()) == []
+    # With a reference, the same session does get told what it ran unasked.
+    with_reference = anchors(record, [action("find_user_id_by_name_zip", zip="76171")])
+    assert [a.kind for a in with_reference] == ["unreferenced_write"]

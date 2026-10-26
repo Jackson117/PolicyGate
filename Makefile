@@ -1,7 +1,7 @@
 UV ?= uv
 PY := .venv/bin/python
 
-.PHONY: sync test lint baseline analyze viz ablate ablate-watched purity
+.PHONY: sync test lint baseline analyze viz ablate ablate-watched purity service
 
 sync:
 	$(UV) sync --extra bench --extra dev
@@ -39,3 +39,7 @@ ablate-watched:
 # harness/ imports no agent framework. CI runs this too.
 purity:
 	$(UV) run python scripts/check_no_framework_deps.py
+
+# The deployment path: the approval service the Live session page talks to.
+service:
+	$(UV) run uvicorn policygate.service.api:build --factory --port 8000

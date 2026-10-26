@@ -453,12 +453,22 @@ class Anchor(BaseModel):
     detail: str
 
 
-def chain_rows(session: SessionRecord | None) -> list[ChainRow]:
+def _records_of(source: Any) -> tuple[Any, ...]:
+    """The records, whether given a saved run's SessionRecord or a live session's own.
+
+    A benchmark run hands these views a SessionRecord read from disk; a live
+    session hands them the records the service returns. The chain is the same
+    object either way, so the views take both rather than growing a second copy.
+    """
+    if source is None:
+        return ()
+    return tuple(getattr(source, "records", source))
+
+
+def chain_rows(session: Any) -> list[ChainRow]:
     """The chain as rows, each saying whether it links to the one before it."""
-    if session is None:
-        return []
     rows, expected = [], None
-    for record in session.records:
+    for record in _records_of(session):
         linked = expected is None or record.prev_hash == expected
         rows.append(
             ChainRow(
@@ -479,20 +489,20 @@ def chain_rows(session: SessionRecord | None) -> list[ChainRow]:
     return rows
 
 
-def chain_integrity(session: SessionRecord | None) -> tuple[bool, list[str]]:
+def chain_integrity(session: Any) -> tuple[bool, list[str]]:
     """Re-verify the chain from the records themselves, not from a stored flag."""
     from policygate.harness.audit import verify_records
 
     if session is None:
         return False, ["no session record was written for this simulation"]
-    result = verify_records(session.records)
+    result = verify_records(_records_of(session))
     # Positions, not the records' own seq: a tampered record's seq is itself one
     # of the things under suspicion (harness/audit.py, ChainBreak.index).
     return result.intact, [f"record #{b.index} ({b.kind.value}): {b.detail}"
                            for b in result.breaks]
 
 
-def anchors(session: SessionRecord | None, reference: Sequence[Any] = ()) -> list[Anchor]:
+def anchors(session: Any, reference: Sequence[Any] = ()) -> list[Anchor]:
     """Where to look first in a session, with the evidence for each place.
 
     ``reference`` is the task's evaluation actions. Ordered by seq so the list
@@ -500,7 +510,7 @@ def anchors(session: SessionRecord | None, reference: Sequence[Any] = ()) -> lis
     """
     if session is None:
         return []
-    records = list(session.records)
+    records = list(_records_of(session))
     found: list[Anchor] = []
 
     intact, breaks = chain_integrity(session)
@@ -520,6 +530,9 @@ def anchors(session: SessionRecord | None, reference: Sequence[Any] = ()) -> lis
                     + ("Something ran after it." if recovered else "Nothing ran after it.")),
         ))
 
+    # Only when there is something to compare against. A live session has no
+    # reference trajectory, and without this guard every call it makes reads as
+    # "not in the reference" -- which would be an accusation, not an observation.
     wanted = {(a.name, _referent(a.arguments)) for a in reference}
     ran = {(r.tool_call.name, _referent(r.tool_call.arguments)): r for r in executed}
 
@@ -535,7 +548,7 @@ def anchors(session: SessionRecord | None, reference: Sequence[Any] = ()) -> lis
         ))
 
     for key, record in sorted(ran.items(), key=lambda kv: kv[1].seq):
-        if key not in wanted and record.tool_call:
+        if wanted and key not in wanted and record.tool_call:
             found.append(Anchor(
                 seq=record.seq, kind="unreferenced_write",
                 label=f"ran, not in the reference · {key[0]}"
