@@ -38,6 +38,20 @@ name it `PolicygateLightsailDeploy`. Then **IAM → Users → Create user**, att
 that policy, and under **Security credentials → Create access key** choose
 *Command Line Interface (CLI)*.
 
+Creating the policy and attaching it are two separate acts, and the console
+lets you finish the first without the second. Check before deploying:
+
+```bash
+aws sts get-caller-identity                    # which user you are
+aws lightsail get-container-services           # should list nothing, not deny
+```
+
+An `AccessDeniedException` naming `lightsail:GetContainerServices` means the
+policy exists but is not attached to this user. The deploy user cannot check
+its own permissions with `iam:ListAttachedUserPolicies` — that is deliberate,
+so the console is where you look: **IAM → Users →** your user **→
+Permissions**.
+
 Use an IAM user, not the root account: root cannot be scoped, cannot be
 rotated without changing your sign-in, and these keys end up in a shell
 history.
@@ -50,10 +64,22 @@ without the plugin the push step fails:
 ```bash
 brew install awscli
 curl -L "https://s3.us-west-2.amazonaws.com/lightsailctl/latest/darwin-arm64/lightsailctl" \
-  -o /usr/local/bin/lightsailctl && chmod +x /usr/local/bin/lightsailctl
+  -o /opt/homebrew/bin/lightsailctl && chmod +x /opt/homebrew/bin/lightsailctl
 ```
 
 (`darwin-arm64` for Apple Silicon; `darwin-amd64` for Intel.)
+
+AWS's own instructions say `/usr/local/bin`, which on a default Apple Silicon
+Mac is **not writable without sudo** — the curl fails and the only sign is an
+error scrolling past, so the next thing to fail is the image push, twenty
+minutes into a build. `/opt/homebrew/bin` is Homebrew's own directory, already
+on PATH and already writable. Check it landed before moving on:
+
+```bash
+which lightsailctl
+```
+
+There is no Homebrew formula for it; the download is the only route.
 
 ### 3. Credentials and a region
 
