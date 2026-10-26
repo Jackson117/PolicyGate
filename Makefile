@@ -22,9 +22,15 @@ analyze:
 
 # --- W4 and after -----------------------------------------------------------
 
+# .env is the project's provider configuration, and a shell that exports
+# OPENAI_API_KEY would otherwise shadow it: load_dotenv never overrides what is
+# already set, so the process would quietly use another account's key against
+# this project's base URL. Sourcing it here makes the environment explicit.
+ENV := set -a; . ./.env; set +a;
+
 # The dashboard over experiments/. POLICYGATE_RUN_DIR picks the run it opens.
 viz:
-	$(UV) run streamlit run src/policygate/viz/app.py --server.port 8501
+	$(ENV) $(UV) run streamlit run src/policygate/viz/app.py --server.port 8501
 
 # One ablation run. Costs money: --dry-run first, and mind --budget.
 OUT ?= experiments/run
@@ -42,4 +48,4 @@ purity:
 
 # The deployment path: the approval service the Live session page talks to.
 service:
-	$(UV) run uvicorn policygate.service.api:build --factory --port 8000
+	$(ENV) $(UV) run uvicorn policygate.service.api:build --factory --port 8000
