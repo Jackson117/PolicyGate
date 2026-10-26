@@ -26,3 +26,14 @@ experiments/**/figures/*.png
 
 # Vendored benchmark (pinned separately, see third_party/PIN.md)
 third_party/tau2-bench/
+
+# Per-run driver logs: raw and large (0.8-5 MB each), same reason as the traces
+# above. What a run has to prove about itself is in its plan.json and ledger.json.
+experiments/**/run.log
+
+# The service's local audit store. The committed evidence is under experiments/;
+# this is whatever the last `make service` happened to record.
+audit.db
+
+# Editor/agent workspace config
+.claude/
