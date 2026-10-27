@@ -49,18 +49,38 @@ if ! aws lightsail get-container-services --service-name "$SERVICE" >/dev/null 2
     --service-name "$SERVICE" --power "$POWER" --scale "$SCALE" >/dev/null
 fi
 
-# Outside the branch above on purpose: a service that already exists can still
-# be PENDING -- created a moment ago, or updating -- and pushing to a registry
-# that is not ready fails after the upload rather than before it.
-state=$(aws lightsail get-container-services --service-name "$SERVICE" \
-          --query 'containerServices[0].state' --output text)
-if [ "$state" != "READY" ]; then
-  echo "==> service is $state; waiting for READY (a few minutes)"
-  until [ "$(aws lightsail get-container-services --service-name "$SERVICE" \
-              --query 'containerServices[0].state' --output text)" = "READY" ]; do
+# Wait until the service can take a deployment. READY means created and empty;
+# RUNNING means it already has one -- both accept a push, and a service that
+# has ever been deployed to stays RUNNING, so waiting for READY alone waits
+# for ever. PENDING and UPDATING are the ones worth waiting out.
+#
+# Bounded, and an API error is an error: an unbounded loop that treats every
+# failed call as "not yet" turns an expired signature -- a laptop that slept --
+# into a deploy that runs all night.
+wait_for() {  # description, jmespath, deadline-seconds, acceptable-states...
+  local what=$1 query=$2 limit=$3; shift 3
+  local deadline=$(( $(date +%s) + limit )) now failures=0
+  while :; do
+    if ! now=$(aws lightsail get-container-services --service-name "$SERVICE" \
+                 --query "$query" --output text 2>&1); then
+      failures=$(( failures + 1 ))
+      echo "    cannot read $what: $now" >&2
+      [ "$failures" -ge 5 ] && { echo "giving up after 5 failed calls" >&2; return 1; }
+    else
+      failures=0
+      for ok in "$@"; do [ "$now" = "$ok" ] && { echo "    $what is $now"; return 0; }; done
+      case $now in FAILED|*FAILED*) echo "$what is $now" >&2; return 1;; esac
+    fi
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      echo "$what was still '$now' after ${limit}s" >&2
+      return 1
+    fi
     sleep 15
   done
-fi
+}
+
+echo "==> waiting for the service to accept a deployment"
+wait_for "service state" 'containerServices[0].state' 900 READY RUNNING
 
 # lightsailctl talks to Docker itself, through the Go SDK, and the SDK looks at
 # DOCKER_HOST or falls back to unix:///var/run/docker.sock. It knows nothing
@@ -130,6 +150,13 @@ json.dump({
             "POLICYGATE_RUN_CACHE": os.environ["RUN_CACHE"],
             # Containers in one deployment reach each other on localhost.
             "POLICYGATE_SERVICE_URL": "http://localhost:8000",
+            # The Retrieval page embeds the question you type -- one short
+            # string, a millionth of a dollar. It is the only reason the
+            # dashboard holds a provider key, and it spends without going
+            # through the service's per-session cap, so it is deliberate
+            # rather than incidental.
+            "OPENAI_API_KEY": os.environ["OPENAI_API_KEY"],
+            "OPENAI_API_BASE": os.environ["OPENAI_API_BASE"],
         },
         "ports": {"8501": "HTTP"},
     },
@@ -156,11 +183,17 @@ aws lightsail create-container-service-deployment \
   --containers "file://$containers" \
   --public-endpoint "file://$endpoint" >/dev/null
 
+# Not currentDeployment.state: during a rollout that still describes the
+# deployment being replaced, which is ACTIVE, so checking it returns at once
+# and reports success while the new version is still ACTIVATING. The service's
+# own state is the one that moves -- RUNNING, then DEPLOYING, then RUNNING
+# again once the new version is serving.
 echo "==> deploying; this takes a few minutes"
-until [ "$(aws lightsail get-container-services --service-name "$SERVICE" \
-            --query 'containerServices[0].currentDeployment.state' --output text)" = "ACTIVE" ]; do
-  sleep 20
-done
+wait_for "service state" 'containerServices[0].state' 1200 RUNNING
+
+deployed=$(aws lightsail get-container-services --service-name "$SERVICE" \
+             --query 'containerServices[0].currentDeployment.version' --output text)
+echo "    serving deployment version $deployed"
 
 URL=$(aws lightsail get-container-services --service-name "$SERVICE" \
         --query 'containerServices[0].url' --output text)

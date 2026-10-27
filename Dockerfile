@@ -65,6 +65,14 @@ EXPOSE 8501
 COPY --chown=policygate deploy/stage/runs/ /runs/
 COPY --chown=policygate deploy/stage/rag/ /rag/
 ENV POLICYGATE_RUN_ROOT=/runs POLICYGATE_RUN_DIR=/runs/w4_v4 POLICYGATE_RAG_RESULTS=/rag
+
+# The Retrieval page's dependency: policygate-rag as a checkout rather than a
+# wheel, because it resolves the corpus and the embedding cache from its own
+# repository root. Its runtime needs -- numpy, litellm -- are already here, and
+# the naive arm's judge makes no API call. Staged by scripts/stage_deploy.sh;
+# absent, the page says so rather than breaking.
+COPY --chown=policygate deploy/stage/rag-pkg/ /app/rag/
+ENV PYTHONPATH=/app/src:/app/rag/src
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"
 CMD ["streamlit", "run", "src/policygate/viz/app.py", \

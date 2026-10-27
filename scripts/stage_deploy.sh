@@ -31,14 +31,34 @@ for run in "${RUNS[@]}"; do
   echo "staged experiments/$run ($(du -sh "$STAGE/runs/$run" | cut -f1))"
 done
 
-# The banking study's published results: small, and the only thing its page
-# needs. The Retrieval page needs the sibling checkout itself and stays off in
-# the container -- it says so rather than breaking.
+# The banking study's published results: small, and all its page needs.
 if [ -d "$RAG_RESULTS" ]; then
   cp -R "$RAG_RESULTS/." "$STAGE/rag/"
   echo "staged $RAG_RESULTS ($(du -sh "$STAGE/rag" | cut -f1))"
 else
   echo "no rag results at $RAG_RESULTS; the Banking RAG page will say so"
+fi
+
+# The Retrieval page runs the study's own retrieval, and that code resolves the
+# corpus and the embedding cache relative to its repository root -- three
+# parents up from the module. So it needs the checkout's shape, not a wheel:
+# src/ on PYTHONPATH with index_cache/, runs/ledger.json and the banking
+# documents beside it. Without the sibling the page says it is unavailable,
+# which is why the directory is created either way.
+RAG_REPO=${POLICYGATE_RAG_REPO:-$(dirname "$RAG_RESULTS")}
+PKG="$STAGE/rag-pkg"
+mkdir -p "$PKG"
+touch "$PKG/.keep"   # an empty directory is not a COPY source
+DOCS=third_party/tau2-bench/data/tau2/domains/banking_knowledge/documents
+if [ -d "$RAG_REPO/src/policygate_rag" ] && [ -d "$RAG_REPO/index_cache" ]; then
+  mkdir -p "$PKG/src" "$PKG/runs" "$PKG/$(dirname "$DOCS")"
+  cp -R "$RAG_REPO/src/policygate_rag" "$PKG/src/"
+  cp -R "$RAG_REPO/index_cache" "$PKG/"
+  [ -f "$RAG_REPO/runs/ledger.json" ] && cp "$RAG_REPO/runs/ledger.json" "$PKG/runs/"
+  [ -d "$RAG_REPO/$DOCS" ] && cp -R "$RAG_REPO/$DOCS" "$PKG/$(dirname "$DOCS")/"
+  echo "staged the retrieval inspector ($(du -sh "$PKG" | cut -f1))"
+else
+  echo "no policygate-rag checkout at $RAG_REPO; the Retrieval page will say so"
 fi
 
 echo "total staged: $(du -sh "$STAGE" | cut -f1)"
